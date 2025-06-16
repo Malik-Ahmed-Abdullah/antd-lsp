@@ -1,0 +1,86 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "root": true,
+  "vcs": {
+    "clientKind": "git",
+    "defaultBranch": "main",
+    "enabled": true,
+    "useIgnoreFile": true
+  },
+  "files": {
+    "experimentalScannerIgnores": ["node_modules", ".git"],
+    "ignoreUnknown": true
+  },
+  "formatter": {
+    "bracketSameLine": true,
+    "enabled": true,
+    "expand": "auto",
+    "indentStyle": "space"
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+
+  "plugins": [],
+  "grit": {},
+  "graphql": {
+    "assist": { "enabled": false },
+    "formatter": { "enabled": false },
+    "linter": { "enabled": false }
+  },
+
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on",
+        "recommended": true,
+        "useSortedAttributes": "on",
+        "useSortedKeys": "off",
+        "useSortedProperties": "on"
+      }
+    },
+    "enabled": true
+  },
+  "css": {
+    "assist": { "enabled": true },
+    "formatter": { "enabled": true, "indentStyle": "space" },
+    "linter": { "enabled": true },
+    "parser": { "allowWrongLineComments": false, "cssModules": true }
+  },
+
+  "html": {
+    "formatter": {
+      "bracketSameLine": true,
+      "enabled": true,
+      "indentScriptAndStyle": true,
+      "indentStyle": "space"
+    }
+  },
+  "javascript": {
+    "assist": { "enabled": true },
+    "formatter": {
+      "arrowParentheses": "always",
+      "enabled": true,
+      "indentStyle": "space",
+      "lineEnding": "lf",
+      "quoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "all"
+    },
+    "linter": {
+      "enabled": true
+    },
+    "parser": {
+      "jsxEverywhere": false,
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
+  "json": {
+    "assist": { "enabled": true },
+    "formatter": { "enabled": true, "expand": "auto", "indentStyle": "space" },
+    "linter": { "enabled": true }
+  }
+}

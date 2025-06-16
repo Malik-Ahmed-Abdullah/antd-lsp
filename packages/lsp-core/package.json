@@ -1,0 +1,26 @@
+{
+  "name": "@carbonteq/antd-lsp-core",
+  "version": "0.0.1",
+  "packageManager": "bun@1.2.16",
+  "engines": {
+    "bun": ">=1.2.15"
+  },
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@parcel/watcher": "^2.5.1",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "globby": "^14.1.0",
+    "oxlint": "catalog:",
+    "taze": "catalog:",
+    "ts-morph": "^26.0.0",
+    "tsdown": "^0.12.7",
+    "typescript": "catalog:",
+    "vitest": "^3.2.3"
+  }
+}

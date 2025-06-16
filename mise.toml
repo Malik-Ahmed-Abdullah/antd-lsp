@@ -1,0 +1,27 @@
+[tools]
+bun = "latest"
+node = "lts"
+
+[env]
+_.path = ["{{config_root}}/node_modules/.bin"]
+PROJECT_NAME = "{{ config_root | basename }}"
+
+[tasks.info]
+description = "Print project information"
+quiet = true
+run = '''
+echo "Project: $PROJECT_NAME"
+'''
+
+[tasks.update-deps]
+run = "taze -r -I"
+
+[tasks.lint]
+run = "bunx --bun biome check"
+
+[tasks.fmt]
+run = "bunx --bun biome format"
+
+[tasks.oxlint]
+alias = "ol"
+run = "bunx --bun oxlint"
