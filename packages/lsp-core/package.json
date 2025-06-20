@@ -8,17 +8,28 @@
   "main": "dist/index.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "scripts": {},
-  "dependencies": {},
+  "bin": {
+    "antd-ls": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "dependencies": {
+    "@parcel/watcher": "^2.5.1",
+    "globby": "^14.1.0",
+    "oxc-parser": "^0.73.0",
+    "oxc-walker": "^0.3.0",
+    "ts-morph": "^26.0.0",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@parcel/watcher": "^2.5.1",
+    "@oxc-project/types": "^0.73.0",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "globby": "^14.1.0",
     "oxlint": "catalog:",
     "taze": "catalog:",
-    "ts-morph": "^26.0.0",
     "tsdown": "^0.12.7",
     "typescript": "catalog:",
     "vitest": "^3.2.3"
