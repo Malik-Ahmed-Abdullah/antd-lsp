@@ -1,32 +1,30 @@
 {
-  "name": "@carbonteq/antd-lsp-core",
+  "name": "@carbonteq/vscode-antd-lsp",
   "version": "0.0.1",
   "packageManager": "bun@1.2.16",
   "engines": {
-    "bun": ">=1.2.15"
+    "vscode": "^1.60.0"
   },
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
-  "bin": {
-    "antd-ls": "./dist/cli.mjs"
-  },
+  "activationEvents": [
+    "onLanguage:typescript",
+    "onLanguage:javascript",
+    "onStartupFinished"
+  ],
+  "main": "dist/extension.js",
+  "module": "dist/extension.mjs",
+  "types": "dist/extension.d.ts",
   "scripts": {
     "build": "tsdown"
   },
   "dependencies": {
-    "@parcel/watcher": "^2.5.1",
-    "globby": "^14.1.0",
-    "oxc-parser": "^0.73.2",
-    "oxc-walker": "^0.3.0",
-    "ts-morph": "^26.0.0",
-    "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.12"
+    "vscode-languageclient": "^9.0.1",
+    "@carbonteq/antd-lsp-core": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@oxc-project/types": "^0.73.2",
     "@types/bun": "catalog:",
+    "@types/vscode": "^1.101.0",
     "@typescript/native-preview": "catalog:",
     "oxlint": "catalog:",
     "taze": "catalog:",

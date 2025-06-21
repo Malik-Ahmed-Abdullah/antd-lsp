@@ -5,7 +5,7 @@ import {
   TextDocuments,
 } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
-import { scanAndIndexTokens, type TokenIndex } from "./scanner"
+import { scanAndIndexTokens, type TokenIndex } from "./scanner.js"
 
 const attachWatcher = async (rootUri: string, tokenIndex: TokenIndex) => {
   const { unsubscribe } = await watcher.subscribe(rootUri, (err, events) => {
@@ -41,6 +41,7 @@ const configureTokenIndex = async (
 }
 
 export const startServer = (): void => {
+  console.debug("Initializing server...")
   const conn = createConnection(ProposedFeatures.all)
   const docs = new TextDocuments(TextDocument)
 
@@ -51,29 +52,33 @@ export const startServer = (): void => {
   const onDestroy: Array<() => Promise<void>> = []
 
   conn.onInitialize(async (params) => {
-    if (params.workspaceFolders) {
-      for (const workspace of params.workspaceFolders) {
-        await configureTokenIndex(workspace.uri, tokenIndex, onDestroy)
-      }
-    } else if (params.rootUri) {
-      await configureTokenIndex(params.rootUri, tokenIndex, onDestroy)
-    } else if (params.rootPath) {
-      await configureTokenIndex(params.rootPath, tokenIndex, onDestroy)
-    }
+    console.debug("Antd Language Server initializing...")
+    // if (params.workspaceFolders) {
+    //   for (const workspace of params.workspaceFolders) {
+    //     await configureTokenIndex(workspace.uri, tokenIndex, onDestroy)
+    //   }
+    // } else if (params.rootUri) {
+    //   await configureTokenIndex(params.rootUri, tokenIndex, onDestroy)
+    // } else if (params.rootPath) {
+    //   await configureTokenIndex(params.rootPath, tokenIndex, onDestroy)
+    // }
 
     return { capabilities: { hoverProvider: true, inlayHintProvider: true } }
   })
 
   conn.onHover(async ({ textDocument, position }) => {
+    console.debug("Got a hover request...")
     return { contents: { kind: "markdown", value: "## Token Value\nred" } }
   })
 
   conn.onShutdown(async () => {
+    console.debug("Shutting down Antd Language Server...")
     for (const destroy of onDestroy) {
       try {
         await destroy()
       } catch (err) {}
     }
+    console.debug("Antd Language Server shutdown complete.")
   })
 
   console.debug("Starting Antd Language Server...")

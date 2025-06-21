@@ -6,7 +6,9 @@
     "bun": ">=1.2.15"
   },
   "workspaces": {
-    "packages": ["packages/*"],
+    "packages": [
+      "packages/*"
+    ],
     "catalog": {
       "typescript": "^5.8.3",
       "@types/bun": "^1.2.15",
@@ -18,10 +20,10 @@
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:",
-    "typescript": "catalog:",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "taze": "catalog:"
+    "oxlint": "catalog:",
+    "taze": "catalog:",
+    "typescript": "catalog:"
   }
 }

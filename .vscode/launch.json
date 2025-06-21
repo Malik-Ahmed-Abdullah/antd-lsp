@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/packages/vscode-extension/dist/**/*.js"
+            ],
+            "preLaunchTask": "build:vscode-extension"
+        },
+        {
+            "name": "Extension Tests",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
+            ],
+            "outFiles": [
+                "${workspaceFolder}/packages/vscode-extension/dist/**/*.js"
+            ],
+            "preLaunchTask": "build:vscode-extension"
+        },
+        {
+            "name": "Debug LSP Server",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/packages/lsp-core/dist/index.js",
+            "outFiles": [
+                "${workspaceFolder}/packages/lsp-core/dist/**/*.js"
+            ],
+            "preLaunchTask": "build:lsp-core"
+        }
+    ]
+}

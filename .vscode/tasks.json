@@ -1,0 +1,41 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "build",
+			"path": "packages/vscode-extension",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [
+				"$tsc"
+			],
+			"label": "build:vscode-extension",
+			"detail": "tsdown"
+		},
+		{
+			"type": "npm",
+			"script": "build",
+			"path": "packages/lsp-core",
+			"group": "build",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"label": "build:lsp-core",
+			"detail": "tsdown"
+		},
+		{
+			"label": "build",
+			"dependsOn": [
+				"build:vscode-extension",
+				"build:lsp-core"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		}
+	]
+}
