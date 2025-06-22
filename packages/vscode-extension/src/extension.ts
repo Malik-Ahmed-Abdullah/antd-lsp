@@ -14,13 +14,16 @@ export const activate = async (context: ExtensionContext): Promise<void> => {
   const serverModule = context.asAbsolutePath(path.join("dist", "cli.cjs"))
 
   const serverOptions: ServerOptions = {
-    run: { module: serverModule, transport: TransportKind.ipc },
-    debug: { module: serverModule, transport: TransportKind.ipc },
+    run: { transport: TransportKind.ipc, module: serverModule },
+    debug: { transport: TransportKind.ipc, module: serverModule },
   }
 
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "typescript" }],
-    synchronize: { fileEvents: workspace.createFileSystemWatcher("**/*.ts") },
+    synchronize: {
+      fileEvents: workspace.createFileSystemWatcher("**/*.{json,ts}"),
+    },
+    progressOnInitialization: false, // support later on
   }
 
   client = new LanguageClient("antd-ls", serverOptions, clientOptions)

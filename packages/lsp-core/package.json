@@ -16,7 +16,6 @@
     "build": "tsdown"
   },
   "dependencies": {
-    "@parcel/watcher": "^2.5.1",
     "globby": "^14.1.0",
     "oxc-parser": "^0.73.2",
     "oxc-walker": "^0.3.0",

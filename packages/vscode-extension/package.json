@@ -15,7 +15,7 @@
   "engines": {
     "vscode": "^1.99.0"
   },
-  "activationEvents": ["onLanguage:typescript", "onLanguage:javascript"],
+  "activationEvents": ["onLanguage:typescript"],
   "main": "dist/extension.cjs",
   "contributes": {},
   "scripts": {

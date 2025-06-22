@@ -1,27 +1,21 @@
 import {
-  Connection,
+  type Connection,
   createConnection,
+  type DidChangeWatchedFilesParams,
   type Disposable,
+  FileChangeType,
+  type FileOperationOptions,
   type Hover,
   type HoverParams,
   type InitializeParams,
   type InitializeResult,
+  type InlayHint,
+  type InlayHintParams,
   ProposedFeatures,
+  TextDocumentSyncKind,
   TextDocuments,
 } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
-import { scanAndIndexTokens, type TokenIndex } from "./scanner.js"
-import { attachWatcher } from "./watcher.js"
-
-const configureTokenIndex = async (
-  rootUri: string,
-  tokenIndex: TokenIndex,
-  onDestroy: Array<() => Promise<void>>,
-) => {
-  await scanAndIndexTokens(rootUri, tokenIndex)
-  const unsubscribe = await attachWatcher(rootUri, tokenIndex)
-  onDestroy.push(unsubscribe)
-}
 
 export class AntdLs {
   private readonly disposables: Array<Disposable> = []
@@ -41,53 +35,75 @@ export class AntdLs {
   }
 
   async start(): Promise<void> {
-    const initDispose = this.connection.onInitialize(async (params) =>
-      this.onInitialize(params),
-    )
-    this.disposables.push(initDispose)
+    this.connection.onInitialize(this.onInitialize.bind(this))
+    this.connection.onHover(this.onHover.bind(this))
+    this.connection.languages.inlayHint.on(this.onInlayHints.bind(this))
 
-    const hoverDispose = this.connection.onHover(this.onHover.bind(this))
-    this.disposables.push(hoverDispose)
+    this.connection.onDidChangeWatchedFiles(this.handleFileChange.bind(this))
 
-    const shutdownDispose = this.connection.onShutdown(() => {
+    this.connection.onShutdown(async () => {
       console.debug("Antd Language Server shutting down...")
     })
-    this.disposables.push(shutdownDispose)
 
     this.docs.listen(this.connection)
     this.connection.listen()
   }
 
-  async dispose(): Promise<void> {
-    for (const disposable of this.disposables) {
-      try {
-        disposable.dispose()
-      } catch (err) {
-        console.error("Error disposing:", err)
-      }
-    }
-  }
+  // async dispose(): Promise<void> {
+  //   for (const disposable of this.disposables) {
+  //     try {
+  //       disposable.dispose()
+  //     } catch (err) {
+  //       console.error("Error disposing:", err)
+  //     }
+  //   }
+  // }
 
   private async onInitialize(
     params: InitializeParams,
   ): Promise<InitializeResult> {
     console.debug("Antd Language Server initializing...")
-    // if (params.workspaceFolders) {
-    //   for (const workspace of params.workspaceFolders) {
-    //     await configureTokenIndex(workspace.uri, tokenIndex, onDestroy)
-    //   }
-    // } else if (params.rootUri) {
-    //   await configureTokenIndex(params.rootUri, tokenIndex, onDestroy)
-    // } else if (params.rootPath) {
-    //   await configureTokenIndex(params.rootPath, tokenIndex, onDestroy)
-    // }
 
+    const capabilities = params.capabilities
+    const supportsWatchFileChanges =
+      capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration
+
+    // Get from settings or initialize params
+    const fileWatchGlob = "**/*.{ts,json}"
+    let fileOperations: FileOperationOptions = {}
+    if (supportsWatchFileChanges) {
+      fileOperations = {
+        didCreate: { filters: [{ pattern: { glob: fileWatchGlob } }] },
+        didDelete: { filters: [{ pattern: { glob: fileWatchGlob } }] },
+      }
+    }
     return {
-      capabilities: { hoverProvider: true, inlayHintProvider: true },
+      capabilities: {
+        hoverProvider: true,
+        inlayHintProvider: false, // add later on
+        textDocumentSync: TextDocumentSyncKind.Incremental,
+        workspace: { fileOperations },
+      },
       serverInfo: {
         name: "Antd Language Server",
         version: "0.0.1",
       },
+    }
+  }
+
+  private handleFileChange(params: DidChangeWatchedFilesParams): void {
+    for (const event of params.changes) {
+      switch (event.type) {
+        case FileChangeType.Created: {
+          break
+        }
+        case FileChangeType.Changed: {
+          break
+        }
+        case FileChangeType.Deleted: {
+          break
+        }
+      }
     }
   }
 
@@ -102,5 +118,9 @@ export class AntdLs {
     return {
       contents: { kind: "markdown", value: "## Token Value\nred" },
     }
+  }
+
+  private async onInlayHints(params: InlayHintParams): Promise<InlayHint[]> {
+    return []
   }
 }
