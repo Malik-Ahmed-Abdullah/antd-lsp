@@ -6,6 +6,10 @@ alias = "b"
 description = "Production build"
 run = "tsdown"
 
+[tasks.build-cli]
+description = "Production build"
+run = "tsdown -c ./tsdown-cli.config.ts"
+
 [tasks.start]
 description = "Start the language server (production)"
 run = "node dist/cli.js --stdio"

@@ -10,10 +10,11 @@
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "antd-ls": "./dist/cli.mjs"
+    "antd-ls": "./dist/cli.cjs"
   },
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown",
+    "build-cli": "tsdown -c ./tsdown-cli.config.ts"
   },
   "dependencies": {
     "globby": "^14.1.0",

@@ -4,7 +4,7 @@ local cfg = {
 	filetypes = { "typescript" },
 	root_markers = { "package.json", ".git" },
 	name = "antls",
-	cmd = { "node", "./packages/lsp-core/dist/cli.js", "--stdio" },
+	cmd = { "node", "./packages/lsp-core/dist-cli/cli.cjs", "--stdio" },
 }
 
 vim.lsp.config("antls", cfg)
