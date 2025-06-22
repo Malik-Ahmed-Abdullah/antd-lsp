@@ -11,6 +11,7 @@ export default defineConfig({
   minify: false,
   unbundle: true,
   treeshake: true,
+  removeNodeProtocol: true,
   // dts: true,
   dts: {
     isolatedDeclarations: true, // will use oxc to generate dts files

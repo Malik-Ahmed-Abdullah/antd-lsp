@@ -1,31 +1,40 @@
 {
-  "name": "@carbonteq/vscode-antd-lsp",
+  "name": "vscode-antd-lsp",
   "version": "0.0.1",
-  "packageManager": "bun@1.2.16",
-  "engines": {
-    "vscode": "^1.60.0"
+  "packageManager": "bun@1.2.17",
+  "displayName": "Ant Design Language Server",
+  "description": "A Visual Studio Code extension that provides language server support for Ant Design tokens",
+  "publisher": "carbonteq",
+  "preview": true,
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carbonteq/antd-lsp.git"
   },
-  "activationEvents": [
-    "onLanguage:typescript",
-    "onLanguage:javascript",
-    "onStartupFinished"
-  ],
-  "main": "dist/extension.js",
-  "module": "dist/extension.mjs",
-  "types": "dist/extension.d.ts",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "activationEvents": ["onLanguage:typescript", "onLanguage:javascript"],
+  "main": "dist/extension.cjs",
+  "contributes": {},
   "scripts": {
     "build": "tsdown"
   },
+  "vsce": {
+    "dependencies": false
+  },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1",
-    "@carbonteq/antd-lsp-core": "workspace:*"
+    "@carbonteq/antd-lsp-core": "workspace:*",
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@oxc-project/types": "^0.73.2",
     "@types/bun": "catalog:",
-    "@types/vscode": "^1.101.0",
+    "@types/vscode": "^1.99.0",
     "@typescript/native-preview": "catalog:",
+    "@vscode/vsce": "^3.5.0",
     "oxlint": "catalog:",
     "taze": "catalog:",
     "tsdown": "^0.12.8",

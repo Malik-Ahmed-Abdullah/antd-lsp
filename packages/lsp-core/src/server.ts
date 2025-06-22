@@ -1,34 +1,17 @@
-import watcher from "@parcel/watcher"
 import {
+  Connection,
   createConnection,
+  type Disposable,
+  type Hover,
+  type HoverParams,
+  type InitializeParams,
+  type InitializeResult,
   ProposedFeatures,
   TextDocuments,
 } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
 import { scanAndIndexTokens, type TokenIndex } from "./scanner.js"
-
-const attachWatcher = async (rootUri: string, tokenIndex: TokenIndex) => {
-  const { unsubscribe } = await watcher.subscribe(rootUri, (err, events) => {
-    for (const event of events) {
-      switch (event.type) {
-        case "create": {
-          break
-        }
-        case "update": {
-          break
-        }
-        case "delete": {
-          break
-        }
-        default: {
-          throw new Error(`Unknown event type: ${event.type}`)
-        }
-      }
-    }
-  })
-
-  return unsubscribe
-}
+import { attachWatcher } from "./watcher.js"
 
 const configureTokenIndex = async (
   rootUri: string,
@@ -40,18 +23,54 @@ const configureTokenIndex = async (
   onDestroy.push(unsubscribe)
 }
 
-export const startServer = (): void => {
-  console.debug("Initializing server...")
-  const conn = createConnection(ProposedFeatures.all)
-  const docs = new TextDocuments(TextDocument)
+export class AntdLs {
+  private readonly disposables: Array<Disposable> = []
 
-  // will hold tokenName -> value + position etc
-  // On init, fill it with defined tokens
-  // On update to the configured files, update the values
-  const tokenIndex: TokenIndex = new Map()
-  const onDestroy: Array<() => Promise<void>> = []
+  constructor(
+    private readonly connection: Connection,
+    private readonly docs: TextDocuments<TextDocument>,
+  ) {
+    console.debug("AntdLs instance created.")
+  }
 
-  conn.onInitialize(async (params) => {
+  static create(): AntdLs {
+    const connection = createConnection(ProposedFeatures.all)
+    const docs = new TextDocuments(TextDocument)
+
+    return new AntdLs(connection, docs)
+  }
+
+  async start(): Promise<void> {
+    const initDispose = this.connection.onInitialize(async (params) =>
+      this.onInitialize(params),
+    )
+    this.disposables.push(initDispose)
+
+    const hoverDispose = this.connection.onHover(this.onHover.bind(this))
+    this.disposables.push(hoverDispose)
+
+    const shutdownDispose = this.connection.onShutdown(() => {
+      console.debug("Antd Language Server shutting down...")
+    })
+    this.disposables.push(shutdownDispose)
+
+    this.docs.listen(this.connection)
+    this.connection.listen()
+  }
+
+  async dispose(): Promise<void> {
+    for (const disposable of this.disposables) {
+      try {
+        disposable.dispose()
+      } catch (err) {
+        console.error("Error disposing:", err)
+      }
+    }
+  }
+
+  private async onInitialize(
+    params: InitializeParams,
+  ): Promise<InitializeResult> {
     console.debug("Antd Language Server initializing...")
     // if (params.workspaceFolders) {
     //   for (const workspace of params.workspaceFolders) {
@@ -63,25 +82,25 @@ export const startServer = (): void => {
     //   await configureTokenIndex(params.rootPath, tokenIndex, onDestroy)
     // }
 
-    return { capabilities: { hoverProvider: true, inlayHintProvider: true } }
-  })
-
-  conn.onHover(async ({ textDocument, position }) => {
-    console.debug("Got a hover request...")
-    return { contents: { kind: "markdown", value: "## Token Value\nred" } }
-  })
-
-  conn.onShutdown(async () => {
-    console.debug("Shutting down Antd Language Server...")
-    for (const destroy of onDestroy) {
-      try {
-        await destroy()
-      } catch (err) {}
+    return {
+      capabilities: { hoverProvider: true, inlayHintProvider: true },
+      serverInfo: {
+        name: "Antd Language Server",
+        version: "0.0.1",
+      },
     }
-    console.debug("Antd Language Server shutdown complete.")
-  })
+  }
 
-  console.debug("Starting Antd Language Server...")
-  docs.listen(conn)
-  conn.listen()
+  private onHover({ textDocument, position }: HoverParams): Hover {
+    console.debug(
+      "Received hover request for document:",
+      textDocument.uri,
+      "at position:",
+      position,
+    )
+
+    return {
+      contents: { kind: "markdown", value: "## Token Value\nred" },
+    }
+  }
 }

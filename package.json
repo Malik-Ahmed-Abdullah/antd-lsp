@@ -1,7 +1,7 @@
 {
   "name": "ant-lsp",
   "private": true,
-  "packageManager": "bun@1.2.16",
+  "packageManager": "bun@1.2.17",
   "engines": {
     "bun": ">=1.2.15"
   },

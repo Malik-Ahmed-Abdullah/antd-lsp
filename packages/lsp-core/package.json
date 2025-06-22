@@ -1,7 +1,8 @@
 {
   "name": "@carbonteq/antd-lsp-core",
   "version": "0.0.1",
-  "packageManager": "bun@1.2.16",
+  "type": "module",
+  "packageManager": "bun@1.2.17",
   "engines": {
     "bun": ">=1.2.15"
   },

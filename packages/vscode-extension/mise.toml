@@ -6,17 +6,6 @@ alias = "b"
 description = "Production build"
 run = "tsdown"
 
-[tasks.start]
-description = "Start the language server (production)"
-run = "node dist/cli.js --stdio"
+[tasks.package]
 depends = ["build"]
-
-[tasks.start-bun]
-description = "Start the language server with bun (production)"
-run = "bun --bun dist/cli.js --stdio"
-depends = ["build"]
-
-[tasks.dev]
-alias = "d"
-description = "Dev server"
-run = "bun run --watch src/cli.ts --stdio"
+run = "bun vsce package"

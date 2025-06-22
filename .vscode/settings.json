@@ -1,3 +1,14 @@
 {
-    "npm.packageManager": "bun"
+    "npm.packageManager": "bun",
+    "npm.scriptRunner": "bun",
+    "files.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true
+    }
 }

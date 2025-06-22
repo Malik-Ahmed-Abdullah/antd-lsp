@@ -1,19 +1,20 @@
 import { defineConfig } from "tsdown"
 
 export default defineConfig({
-  entry: ["./src/**/*.ts"],
-  platform: "node",
-  format: ["cjs", "esm"],
-  sourcemap: true,
-  clean: true,
-  target: "node20",
-  outDir: "dist",
-  minify: false,
-  unbundle: true,
-  treeshake: true,
-  // dts: true,
-  dts: {
-    isolatedDeclarations: true, // will use oxc to generate dts files
+  entry: {
+    extension: "./src/extension.ts",
+    cli: "./src/cli.ts",
   },
+  platform: "node",
+  format: "cjs",
+  sourcemap: false,
+  clean: true,
+  outDir: "dist",
+  minify: true,
+  unbundle: false,
+  treeshake: true,
+  dts: false,
   external: ["vscode"],
+  // check https://tsdown.dev/options/dependencies
+  noExternal: ["vscode-languageclient/node", "@carbonteq/antd-lsp-core"],
 })

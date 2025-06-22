@@ -11,11 +11,8 @@ let client: LanguageClient | undefined
 
 export const activate = async (context: ExtensionContext): Promise<void> => {
   // Later on, we should add an option to pick the path from settings, and/or download the server automatically.
-  const serverModule = context.asAbsolutePath(
-    path.join("..", "lsp-core", "dist", "cli.js"),
-  )
+  const serverModule = context.asAbsolutePath(path.join("dist", "cli.cjs"))
 
-  console.debug("Path", serverModule)
   const serverOptions: ServerOptions = {
     run: { module: serverModule, transport: TransportKind.ipc },
     debug: { module: serverModule, transport: TransportKind.ipc },
