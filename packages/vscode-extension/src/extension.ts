@@ -14,8 +14,17 @@ export const activate = async (context: ExtensionContext): Promise<void> => {
   const serverModule = context.asAbsolutePath(path.join("dist", "cli.cjs"))
 
   const serverOptions: ServerOptions = {
-    run: { transport: TransportKind.ipc, module: serverModule },
-    debug: { transport: TransportKind.ipc, module: serverModule },
+    run: {
+      transport: TransportKind.ipc,
+      module: serverModule,
+    },
+    debug: {
+      transport: TransportKind.ipc,
+      module: serverModule,
+      options: {
+        execArgv: ["--inspect=6009", "--enable-source-maps"],
+      },
+    },
   }
 
   const clientOptions: LanguageClientOptions = {

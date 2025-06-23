@@ -19,7 +19,8 @@
   "main": "dist/extension.cjs",
   "contributes": {},
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown -c ./tsdown.config.ts",
+    "build-debug": "tsdown --minify=false --sourcemap -c ./tsdown.config.ts"
   },
   "vsce": {
     "dependencies": false

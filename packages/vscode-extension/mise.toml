@@ -9,3 +9,7 @@ run = "tsdown"
 [tasks.package]
 depends = ["build"]
 run = "bun vsce package"
+
+[tasks.build-debug]
+description = "Debug build"
+run = "tsdown --minify=false --sourcemap"
