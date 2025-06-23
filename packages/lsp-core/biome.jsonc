@@ -8,7 +8,8 @@
       ".oxlintrc.json",
       "package.json",
       "tsconfig.json",
-      "tsdown.config.ts"
+      "tsdown.config.ts",
+      "tsdown-cli.config.ts"
     ]
   },
   "extends": "//"

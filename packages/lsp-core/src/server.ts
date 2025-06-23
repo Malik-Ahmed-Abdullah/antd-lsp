@@ -1,87 +1,126 @@
-import watcher from "@parcel/watcher"
 import {
+  type Connection,
   createConnection,
+  type DidChangeWatchedFilesParams,
+  type Disposable,
+  FileChangeType,
+  type FileOperationOptions,
+  type Hover,
+  type HoverParams,
+  type InitializeParams,
+  type InitializeResult,
+  type InlayHint,
+  type InlayHintParams,
   ProposedFeatures,
+  TextDocumentSyncKind,
   TextDocuments,
 } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
-import { scanAndIndexTokens, type TokenIndex } from "./scanner.js"
 
-const attachWatcher = async (rootUri: string, tokenIndex: TokenIndex) => {
-  const { unsubscribe } = await watcher.subscribe(rootUri, (err, events) => {
-    for (const event of events) {
+export class AntdLs {
+  private readonly disposables: Array<Disposable> = []
+
+  constructor(
+    private readonly connection: Connection,
+    private readonly docs: TextDocuments<TextDocument>,
+  ) {
+    console.debug("AntdLs instance created.")
+  }
+
+  static create(): AntdLs {
+    const connection = createConnection(ProposedFeatures.all)
+    const docs = new TextDocuments(TextDocument)
+
+    return new AntdLs(connection, docs)
+  }
+
+  async start(): Promise<void> {
+    this.connection.onInitialize(this.onInitialize.bind(this))
+    this.connection.onHover(this.onHover.bind(this))
+    this.connection.languages.inlayHint.on(this.onInlayHints.bind(this))
+
+    this.connection.onDidChangeWatchedFiles(this.handleFileChange.bind(this))
+
+    this.connection.onShutdown(async () => {
+      console.debug("Antd Language Server shutting down...")
+    })
+
+    this.docs.listen(this.connection)
+    this.connection.listen()
+  }
+
+  // async dispose(): Promise<void> {
+  //   for (const disposable of this.disposables) {
+  //     try {
+  //       disposable.dispose()
+  //     } catch (err) {
+  //       console.error("Error disposing:", err)
+  //     }
+  //   }
+  // }
+
+  private async onInitialize(
+    params: InitializeParams,
+  ): Promise<InitializeResult> {
+    console.debug("Antd Language Server initializing...")
+
+    const capabilities = params.capabilities
+    const supportsWatchFileChanges =
+      capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration
+
+    // Get from settings or initialize params
+    const fileWatchGlob = "**/*.{ts,json}"
+    let fileOperations: FileOperationOptions = {}
+    if (supportsWatchFileChanges) {
+      fileOperations = {
+        didCreate: { filters: [{ pattern: { glob: fileWatchGlob } }] },
+        didDelete: { filters: [{ pattern: { glob: fileWatchGlob } }] },
+      }
+    }
+    return {
+      capabilities: {
+        hoverProvider: true,
+        inlayHintProvider: false, // add later on
+        textDocumentSync: TextDocumentSyncKind.Incremental,
+        workspace: { fileOperations },
+      },
+      serverInfo: {
+        name: "Antd Language Server",
+        version: "0.0.1",
+      },
+    }
+  }
+
+  private handleFileChange(params: DidChangeWatchedFilesParams): void {
+    for (const event of params.changes) {
       switch (event.type) {
-        case "create": {
+        case FileChangeType.Created: {
           break
         }
-        case "update": {
+        case FileChangeType.Changed: {
           break
         }
-        case "delete": {
+        case FileChangeType.Deleted: {
           break
-        }
-        default: {
-          throw new Error(`Unknown event type: ${event.type}`)
         }
       }
     }
-  })
+  }
 
-  return unsubscribe
-}
+  private onHover({ textDocument, position }: HoverParams): Hover {
+    console.debug(
+      "Received hover request for document:",
+      textDocument.uri,
+      "at position:",
+      position,
+    )
 
-const configureTokenIndex = async (
-  rootUri: string,
-  tokenIndex: TokenIndex,
-  onDestroy: Array<() => Promise<void>>,
-) => {
-  await scanAndIndexTokens(rootUri, tokenIndex)
-  const unsubscribe = await attachWatcher(rootUri, tokenIndex)
-  onDestroy.push(unsubscribe)
-}
-
-export const startServer = (): void => {
-  console.debug("Initializing server...")
-  const conn = createConnection(ProposedFeatures.all)
-  const docs = new TextDocuments(TextDocument)
-
-  // will hold tokenName -> value + position etc
-  // On init, fill it with defined tokens
-  // On update to the configured files, update the values
-  const tokenIndex: TokenIndex = new Map()
-  const onDestroy: Array<() => Promise<void>> = []
-
-  conn.onInitialize(async (params) => {
-    console.debug("Antd Language Server initializing...")
-    // if (params.workspaceFolders) {
-    //   for (const workspace of params.workspaceFolders) {
-    //     await configureTokenIndex(workspace.uri, tokenIndex, onDestroy)
-    //   }
-    // } else if (params.rootUri) {
-    //   await configureTokenIndex(params.rootUri, tokenIndex, onDestroy)
-    // } else if (params.rootPath) {
-    //   await configureTokenIndex(params.rootPath, tokenIndex, onDestroy)
-    // }
-
-    return { capabilities: { hoverProvider: true, inlayHintProvider: true } }
-  })
-
-  conn.onHover(async ({ textDocument, position }) => {
-    console.debug("Got a hover request...")
-    return { contents: { kind: "markdown", value: "## Token Value\nred" } }
-  })
-
-  conn.onShutdown(async () => {
-    console.debug("Shutting down Antd Language Server...")
-    for (const destroy of onDestroy) {
-      try {
-        await destroy()
-      } catch (err) {}
+    return {
+      contents: { kind: "markdown", value: "## Token Value\nred" },
     }
-    console.debug("Antd Language Server shutdown complete.")
-  })
+  }
 
-  console.debug("Starting Antd Language Server...")
-  docs.listen(conn)
-  conn.listen()
+  private async onInlayHints(params: InlayHintParams): Promise<InlayHint[]> {
+    return []
+  }
 }

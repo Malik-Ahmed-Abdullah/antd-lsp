@@ -1,5 +1,16 @@
 {
     "version": "0.2.0",
+    "compounds": [
+        {
+            "name": "Extension + LSP Server (Debug)",
+            "configurations": [
+                "Run Extension",
+                "Attach to LSP Server (Extension)"
+            ],
+            "preLaunchTask": "build-debug:extension-and-lsp-core",
+            "isDefault": true
+        }
+    ],
     "configurations": [
         {
             "name": "Run Extension",
@@ -11,29 +22,33 @@
             "outFiles": [
                 "${workspaceFolder}/packages/vscode-extension/dist/**/*.js"
             ],
-            "preLaunchTask": "build:vscode-extension"
+            "preLaunchTask": "build-debug:vscode-extension"
         },
         {
-            "name": "Extension Tests",
-            "type": "extensionHost",
-            "request": "launch",
-            "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
-            ],
+            "name": "Attach to LSP Server (Extension)",
+            "type": "node",
+            "request": "attach",
+            "port": 6009,
+            "restart": true,
             "outFiles": [
-                "${workspaceFolder}/packages/vscode-extension/dist/**/*.js"
+                "${workspaceFolder}/packages/vscode-extension/dist/**/*",
+                "${workspaceFolder}/packages/lsp-core/dist/**/*"
             ],
-            "preLaunchTask": "build:vscode-extension"
+            "sourceMaps": true,
+            "trace": true
         },
         {
-            "name": "Debug LSP Server",
+            "name": "Run LSP Server (CLI)",
             "type": "node",
             "request": "launch",
-            "program": "${workspaceFolder}/packages/lsp-core/dist/index.js",
+            "program": "${workspaceFolder}/packages/lsp-core/dist-cli/cli.cjs",
             "outFiles": [
-                "${workspaceFolder}/packages/lsp-core/dist/**/*.js"
+                "${workspaceFolder}/packages/lsp-core/dist/**/*",
+                "${workspaceFolder}/packages/lsp-core/dist-cli/*"
             ],
-            "preLaunchTask": "build:lsp-core"
+            "sourceMaps": true,
+            "trace": true,
+            "preLaunchTask": "build-debug:lsp-core-cli"
         }
     ]
 }

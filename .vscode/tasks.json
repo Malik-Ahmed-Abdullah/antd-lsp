@@ -13,7 +13,21 @@
 				"$tsc"
 			],
 			"label": "build:vscode-extension",
-			"detail": "tsdown"
+			"detail": "Build for vscode extension"
+		},
+		{
+			"type": "npm",
+			"script": "build-debug",
+			"path": "packages/vscode-extension",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [
+				"$tsc"
+			],
+			"label": "build-debug:vscode-extension",
+			"detail": "Debug build for vscode extension"
 		},
 		{
 			"type": "npm",
@@ -24,18 +38,68 @@
 				"$tsc"
 			],
 			"label": "build:lsp-core",
-			"detail": "tsdown"
+			"detail": "Build for lsp-core"
+		},
+		{
+			"type": "npm",
+			"script": "build-debug",
+			"path": "packages/lsp-core",
+			"group": "build",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"label": "build-debug:lsp-core",
+			"detail": "Debug build for lsp-core"
+		},
+		{
+			"type": "npm",
+			"script": "build-cli",
+			"path": "packages/lsp-core",
+			"group": "build",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"label": "build:lsp-core-cli",
+			"detail": "Build for lsp-core cli"
+		},
+		{
+			"type": "npm",
+			"script": "build-debug-cli",
+			"path": "packages/lsp-core",
+			"group": "build",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"label": "build-debug:lsp-core-cli",
+			"detail": "Debug build for lsp-core cli"
 		},
 		{
 			"label": "build",
 			"dependsOn": [
 				"build:vscode-extension",
-				"build:lsp-core"
+				"build:lsp-core",
+				"build:lsp-core-cli"
 			],
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			}
+		},
+		{
+			"label": "build:extension-and-lsp-core",
+			"dependsOn": [
+				"build-debug:vscode-extension",
+				"build-debug:lsp-core"
+			],
+			"group": "build"
+		},
+		{
+			"label": "build-debug:extension-and-lsp-core",
+			"dependsOn": [
+				"build-debug:vscode-extension",
+				"build-debug:lsp-core"
+			],
+			"group": "build"
 		}
 	]
 }

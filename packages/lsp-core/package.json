@@ -1,7 +1,8 @@
 {
   "name": "@carbonteq/antd-lsp-core",
   "version": "0.0.1",
-  "packageManager": "bun@1.2.16",
+  "type": "module",
+  "packageManager": "bun@1.2.17",
   "engines": {
     "bun": ">=1.2.15"
   },
@@ -9,13 +10,15 @@
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "antd-ls": "./dist/cli.mjs"
+    "antd-ls": "./dist/cli.cjs"
   },
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown -c ./tsdown.config.ts",
+    "build-debug": "tsdown -c ./tsdown.config.ts --minify=false --sourcemap",
+    "build-cli": "tsdown -c ./tsdown-cli.config.ts",
+    "build-debug-cli": "tsdown --minify=false --sourcemap -c ./tsdown-cli.config.ts"
   },
   "dependencies": {
-    "@parcel/watcher": "^2.5.1",
     "globby": "^14.1.0",
     "oxc-parser": "^0.73.2",
     "oxc-walker": "^0.3.0",
@@ -35,3 +38,4 @@
     "vitest": "^3.2.4"
   }
 }
+

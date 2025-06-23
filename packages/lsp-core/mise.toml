@@ -6,6 +6,18 @@ alias = "b"
 description = "Production build"
 run = "tsdown"
 
+[tasks.build-debug]
+description = "Debug build"
+run = "tsdown --minify=false --sourcemap"
+
+[tasks.build-cli]
+description = "CLI production build"
+run = "tsdown -c ./tsdown-cli.config.ts"
+
+[tasks.build-cli-debug]
+description = "CLI debug build"
+run = "tsdown -c ./tsdown-cli.config.ts --minify=false --sourcemap"
+
 [tasks.start]
 description = "Start the language server (production)"
 run = "node dist/cli.js --stdio"
