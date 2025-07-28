@@ -16,9 +16,15 @@ import {
   TextDocuments,
 } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
+import { getWordAtPosition, resolveFullTokenValueAtPosition } from "./util"
+import { TokenIndex, TokenData } from "./scanner"
+import { Position, Location } from "vscode-languageserver-types"
+import { scanAndIndexTokens } from './scanner'
+import { fileURLToPath } from 'url'; 
 
 export class AntdLs {
-  private readonly disposables: Array<Disposable> = []
+  private readonly disposables: Array<Disposable> = [];
+  private tokenIndex: TokenIndex = new Map();
 
   constructor(
     private readonly connection: Connection,
@@ -37,6 +43,7 @@ export class AntdLs {
   async start(): Promise<void> {
     this.connection.onInitialize(this.onInitialize.bind(this))
     this.connection.onHover(this.onHover.bind(this))
+    this.connection.onDefinition(this.onDefinition.bind(this));
     this.connection.languages.inlayHint.on(this.onInlayHints.bind(this))
 
     this.connection.onDidChangeWatchedFiles(this.handleFileChange.bind(this))
@@ -59,37 +66,41 @@ export class AntdLs {
   //   }
   // }
 
-  private async onInitialize(
-    params: InitializeParams,
-  ): Promise<InitializeResult> {
-    console.debug("Antd Language Server initializing...")
+  private async onInitialize(params: InitializeParams): Promise<InitializeResult> {
+  console.debug("Antd Language Server initializing...")
 
-    const capabilities = params.capabilities
-    const supportsWatchFileChanges =
-      capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration
+  const capabilities = params.capabilities;
+  const supportsWatchFileChanges =
+    capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration;
 
-    // Get from settings or initialize params
-    const fileWatchGlob = "**/*.{ts,json}"
-    let fileOperations: FileOperationOptions = {}
-    if (supportsWatchFileChanges) {
-      fileOperations = {
-        didCreate: { filters: [{ pattern: { glob: fileWatchGlob } }] },
-        didDelete: { filters: [{ pattern: { glob: fileWatchGlob } }] },
-      }
-    }
-    return {
-      capabilities: {
-        hoverProvider: true,
-        inlayHintProvider: false, // add later on
-        textDocumentSync: TextDocumentSyncKind.Incremental,
-        workspace: { fileOperations },
-      },
-      serverInfo: {
-        name: "Antd Language Server",
-        version: "0.0.1",
-      },
-    }
+  const fileWatchGlob = "**/*.{ts,json}";
+  let fileOperations: FileOperationOptions = {};
+  if (supportsWatchFileChanges) {
+    fileOperations = {
+      didCreate: { filters: [{ pattern: { glob: fileWatchGlob } }] },
+      didDelete: { filters: [{ pattern: { glob: fileWatchGlob } }] },
+    };
   }
+
+  const rootUri = params.rootUri ?? "";
+  const rootPath = fileURLToPath(rootUri); // <- needed
+
+  await scanAndIndexTokens(rootPath, this.tokenIndex); // <- missing
+
+  return {
+    capabilities: {
+      hoverProvider: true,
+      inlayHintProvider: false,
+      definitionProvider: true,
+      textDocumentSync: TextDocumentSyncKind.Incremental,
+      workspace: { fileOperations },
+    },
+    serverInfo: {
+      name: "Antd Language Server",
+      version: "0.0.1",
+    },
+  };
+}
 
   private handleFileChange(params: DidChangeWatchedFilesParams): void {
     for (const event of params.changes) {
@@ -107,17 +118,76 @@ export class AntdLs {
     }
   }
 
-  private onHover({ textDocument, position }: HoverParams): Hover {
-    console.debug(
-      "Received hover request for document:",
-      textDocument.uri,
-      "at position:",
-      position,
-    )
+  private onHover({ textDocument, position }: HoverParams): Hover | undefined {
+    const doc = this.docs.get(textDocument.uri);
+    if (!doc) return;
 
-    return {
-      contents: { kind: "markdown", value: "## Token Value\nred" },
+    const word = getWordAtPosition(doc, position);
+    const fileContent = doc.getText();
+
+    this.connection.console.log(`[Hover] Word: ${word}`);
+
+    const resolvedValue = resolveFullTokenValueAtPosition(
+      word,
+      fileContent,
+      position
+    );
+
+    if (resolvedValue) {
+      this.connection.console.log(
+        `[Hover] Resolved Value (local): ${resolvedValue}`
+      );
+      return {
+        contents: {
+          kind: "markdown",
+          value: `**AntD Token**: \`${word}\`\n\n📄 From local variable: \`${resolvedValue}\``,
+        },
+      };
     }
+
+    const token = this.tokenIndex.get(word);
+    this.connection.console.log(
+      `[Hover] Token Index Value: ${JSON.stringify(token)}`
+    );
+
+    if (token && token.value) {
+      return {
+        contents: {
+          kind: "markdown",
+          value: `**AntD Token**: \`${word}\`\n\n🎨 Value: \`${token.value}\``,
+        },
+      };
+    }
+
+    return undefined;
+  }
+
+  private onDefinition({
+    textDocument,
+    position,
+  }: {
+    textDocument: { uri: string };
+    position: Position;
+  }): Location[] {
+    const doc = this.docs.get(textDocument.uri);
+    if (!doc) return [];
+
+    const word = getWordAtPosition(doc, position);
+    const token = this.tokenIndex.get(word);
+    if (!token) return [];
+
+    return [
+      {
+        uri: token.uri,
+        range: {
+          start: token.position,
+          end: {
+            line: token.position.line,
+            character: token.position.character + word.length,
+          },
+        },
+      },
+    ];
   }
 
   private async onInlayHints(params: InlayHintParams): Promise<InlayHint[]> {

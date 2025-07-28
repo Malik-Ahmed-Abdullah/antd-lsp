@@ -6,7 +6,9 @@
     "bun": ">=1.2.15"
   },
   "workspaces": {
-    "packages": ["packages/*"],
+    "packages": [
+      "packages/*"
+    ],
     "catalog": {
       "typescript": "^5.8.3",
       "@types/bun": "^1.2.15",
@@ -23,5 +25,26 @@
     "oxlint": "catalog:",
     "taze": "catalog:",
     "typescript": "catalog:"
-  }
+  },
+  "version": "1.0.0",
+  "description": "Install [mise](https://mise.jdx.dev/getting-started.html) followed by",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Malik-Ahmed-Abdullah/antd-lsp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Malik-Ahmed-Abdullah/antd-lsp/issues"
+  },
+  "homepage": "https://github.com/Malik-Ahmed-Abdullah/antd-lsp#readme"
 }
