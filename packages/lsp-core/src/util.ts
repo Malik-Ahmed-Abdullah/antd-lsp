@@ -262,3 +262,41 @@ export function findExactTokenDefinitionAtPosition(
 
   return def ?? tokenDefs[0]; // fallback
 }
+
+import { Project } from "ts-morph";
+
+export function resolveLocalTokenAtPosition(
+  filePath: string,
+  content: string,
+  position: Position,
+  tokenName: string
+): string | undefined {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const sourceFile = project.createSourceFile(filePath, content);
+
+  const node = sourceFile.getDescendantAtPos(
+    sourceFile.compilerNode.getPositionOfLineAndCharacter(position.line, position.character)
+  );
+
+  if (!node || node.getText() !== tokenName) return;
+
+  const symbol = node.getSymbol();
+  if (!symbol) return;
+
+  const decls = symbol.getDeclarations();
+  const varDecl = decls.find(d => d.getKindName() === "VariableDeclaration");
+
+  if (!varDecl) return;
+
+  // Cast to VariableDeclaration to access getInitializer()
+  const valueNode = (varDecl as import("ts-morph").VariableDeclaration).getInitializer?.();
+  if (!valueNode) return;
+
+  // Only show literal values (string, number) or simple identifiers
+  const kind = valueNode.getKindName();
+  if (kind === "StringLiteral" || kind === "NumericLiteral" || kind === "Identifier") {
+    return valueNode.getText();
+  }
+
+  return undefined;
+}

@@ -15,7 +15,7 @@ import {
   TextDocuments,
 } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
-import { getWordAtPosition, resolveFullTokenValueAtPosition, getTokenPropertyAtPosition , findExactTokenDefinitionAtPosition} from "./util"
+import { getWordAtPosition, resolveFullTokenValueAtPosition, getTokenPropertyAtPosition , findExactTokenDefinitionAtPosition , resolveLocalTokenAtPosition} from "./util"
 import { TokenIndex, TokenData } from "./scanner"
 import { Position, Location } from "vscode-languageserver-types"
 import { scanAndIndexTokens } from './scanner'
@@ -199,7 +199,24 @@ export class AntdLs {
 
     this.connection.console.log(`[Hover] Word: ${word} at ${position.line}:${position.character}, Index size: ${this.tokenIndex.size}`);
 
-    // First, try to resolve local token values (like theme.token.colorPrimary)
+    //resolve local variable values first
+    const localValue = resolveLocalTokenAtPosition(
+      textDocument.uri,
+      fileContent,
+      position,
+      word
+    );
+
+    if (localValue !== undefined) {
+      this.connection.console.log(`[Hover] '${word}' resolved from local variable`);
+      return {
+        contents: {
+          kind: 'markdown',
+          value: `**Ant Design Token (local)**: \`${word}\`\n\n💡 \`${localValue}\` *(from local declaration)*`
+        }
+      };
+    }
+    // First, try to resolve local token values like theme.token.colorPrimary
     const resolvedValues = resolveFullTokenValueAtPosition(
       word,
       fileContent,
