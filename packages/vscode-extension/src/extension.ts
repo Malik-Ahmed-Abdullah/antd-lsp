@@ -28,12 +28,20 @@ export const activate = async (context: ExtensionContext): Promise<void> => {
   }
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "typescript" }],
+    documentSelector: [
+      { scheme: "file", language: "typescript" },
+      { scheme: "file", language: "typescriptreact" },
+      { scheme: "file", language: "javascript" },
+      { scheme: "file", language: "javascriptreact" },
+      { scheme: "file", language: "json" },
+    ],
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher("**/*.{json,ts}"),
+      fileEvents: workspace.createFileSystemWatcher("**/*.{ts,tsx,js,jsx,json}")
     },
-    progressOnInitialization: false, // support later on
-  }
+    initializationOptions: {},
+    progressOnInitialization: true,
+  };
+
 
   client = new LanguageClient("antd-ls", serverOptions, clientOptions)
 
