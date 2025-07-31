@@ -226,6 +226,8 @@ function resolveObjectValue(
 
   if (ts.isStringLiteral(current)) {
     return current.text;
+  } else if (ts.isNumericLiteral(current)) {
+    return current.text; // Add this line
   } else if (ts.isObjectLiteralExpression(current)) {
     return "[object]";
   }

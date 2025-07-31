@@ -17,8 +17,8 @@ export type TokenData = {
 
 export type TokenIndex = Map<TokenName, TokenData[]>; // Changed to array to handle multiple definitions
 
-const supportedExtensions = /\.(ts|tsx|js|jsx|json|css|less|scss)$/;
-const ignoredDirs = ["node_modules", "dist", "build", ".git", ".next", "out"];
+const supportedExtensions = /\.(ts|tsx|js|jsx|json)$/;  // disgarded |css|less|scss
+const ignoredDirs = ["node_modules", "dist", "build", ".git", ".next", "out", "coverage", "public", "tmp", "temp", "logs", "cache", "css", "scss", "less", "styles", "assets", "static", "vendor", "bower_components"];
 
 // Common Ant Design token names for better matching
 const commonAntdTokens = new Set([
@@ -47,9 +47,10 @@ export async function scanAndIndexTokens(
       await extractFromTsxTs(filePath, content, tokenIndex);
     } else if (filePath.endsWith(".json")) {
       await extractFromJson(filePath, content, tokenIndex);
-    } else if (/\.(css|less|scss)$/.test(filePath)) {
-      await extractFromCssLike(filePath, content, tokenIndex);
-    }
+    } 
+    //else if (/\.(css|less|scss)$/.test(filePath)) {
+    //   await extractFromCssLike(filePath, content, tokenIndex);
+    // }
   }));
 }
 
@@ -86,10 +87,10 @@ async function extractFromTsxTs(
   await extractFromConfigProvider(sourceFile, filePath, index);
   
   // Extract from useToken() and getToken() hooks
-  //await _extractFromTokenHooks(sourceFile, filePath, index);
+  // await _extractFromTokenHooks(sourceFile, filePath, index); causes errors for now as its overriding values of tokens but not fixed as unused
   
   // Extract token property accesses
-  //await extractTokenPropertyAccess(sourceFile, filePath, index);
+  // await  _extractTokenPropertyAccess(sourceFile, filePath, index);
 
   // Use ts-morph for advanced extraction
   if (filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
@@ -461,7 +462,7 @@ async function extractFromJson(
 }
 
 
-async function extractFromCssLike(
+async function _extractFromCssLike( //function not used for now
   filePath: string,
   content: string,
   index: TokenIndex
