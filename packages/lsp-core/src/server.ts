@@ -20,6 +20,7 @@ import { TokenIndex, TokenData } from "./scanner"
 import { Position, Location } from "vscode-languageserver-types"
 import { scanAndIndexTokens } from './scanner'
 import { fileURLToPath } from 'url'; 
+import { createRenameHandler } from './rename'; 
 
 export class AntdLs {
   private readonly disposables: Array<Disposable> = [];
@@ -48,6 +49,10 @@ export class AntdLs {
     this.connection.onDefinition(this.onDefinition.bind(this));
     this.connection.languages.inlayHint.on(this.onInlayHints.bind(this))
 
+    const renameHandler = createRenameHandler(this.docs, this.tokenIndex, this.connection);
+    this.connection.onPrepareRename(renameHandler.prepareRename);
+    this.connection.onRenameRequest(renameHandler.rename);
+    
     this.connection.onDidChangeWatchedFiles(this.handleFileChange.bind(this))
 
     // Also trigger indexing when documents are opened
@@ -85,6 +90,9 @@ export class AntdLs {
         hoverProvider: true,
         inlayHintProvider: false,
         definitionProvider: true,
+        renameProvider: {
+          prepareProvider: true, // Enable prepare rename
+        },
         textDocumentSync: TextDocumentSyncKind.Incremental,
         workspace: { fileOperations },
       },
