@@ -46,5 +46,8 @@
   "bugs": {
     "url": "https://github.com/Malik-Ahmed-Abdullah/antd-lsp/issues"
   },
-  "homepage": "https://github.com/Malik-Ahmed-Abdullah/antd-lsp#readme"
+  "homepage": "https://github.com/Malik-Ahmed-Abdullah/antd-lsp#readme",
+  "dependencies": {
+    "vscode-uri": "^3.1.0"
+  }
 }

@@ -1,6 +1,21 @@
 import { Position } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { TokenIndex } from './scanner';
 import ts from "typescript";
+
+export function getAllTokenURIs(tokenIndex: TokenIndex): string[] {
+  const uris = new Set<string>();
+
+  for (const tokenList of Array.from(tokenIndex.values())) {
+    for (const tokenData of tokenList) {
+      if (tokenData.uri) {
+        uris.add(tokenData.uri);
+      }
+    }
+  }
+
+  return Array.from(uris);
+}
 
 export function getWordAtPosition(doc: TextDocument, position: Position): string {
   const line = doc.getText({

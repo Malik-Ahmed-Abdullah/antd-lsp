@@ -374,33 +374,85 @@ export class AntdLs {
   private onDefinition({
     textDocument,
     position,
-  }: {
-    textDocument: { uri: string };
-    position: Position;
-  }): Location[] {
-    const doc = this.docs.get(textDocument.uri);
-    if (!doc || !this.isInitialized) return [];
+    }: {
+      textDocument: { uri: string };
+      position: Position;
+    }): Location[] {
+      const doc = this.docs.get(textDocument.uri);
+      if (!doc || !this.isInitialized) return [];
 
-    const word = getWordAtPosition(doc, position);
-    
-    // Check if we're hovering over a token property access
-    const tokenProperty = getTokenPropertyAtPosition(doc, position);
-    const searchTerm = tokenProperty || word;
-    
-    const tokenDefs = this.tokenIndex.get(searchTerm);
-    if (!tokenDefs || tokenDefs.length === 0) return [];
+      // Try to get token name from property access first
+      let searchTerm = getTokenPropertyAtPosition(doc, position) || getWordAtPosition(doc, position);
+      if (!searchTerm) return [];
 
-    return tokenDefs.map(token => ({
-      uri: token.uri,
-      range: {
-        start: token.position,
-        end: {
-          line: token.position.line,
-          character: token.position.character + searchTerm.length,
-        },
-      },
-    }));
-  }
+      // Get all definitions for this token
+      const tokenDefs = this.tokenIndex.get(searchTerm);
+      if (!tokenDefs || tokenDefs.length === 0) return [];
+
+      // Debug logging to understand what we're finding
+      this.connection.console.log(`[Definition] Found ${tokenDefs.length} definitions for '${searchTerm}'`);
+      tokenDefs.forEach((def, i) => {
+        this.connection.console.log(`[Definition] ${i + 1}. Source: ${def.source}, URI: ${def.uri}, Value: ${def.value}`);
+      });
+
+             // Filter out node_modules completely and prioritize workspace themeConfig (your tokens.ts file)
+       const workspaceOnly = tokenDefs.filter(def => !def.uri.includes("node_modules"));
+       const workspaceThemeConfigDefs = workspaceOnly.filter(def => def.source === "themeConfig");
+       const workspaceConfigProviderDefs = workspaceOnly.filter(def => def.source === "configProvider");
+
+       this.connection.console.log(`[Definition] Workspace-only: ${workspaceOnly.length}, ThemeConfig: ${workspaceThemeConfigDefs.length}, ConfigProvider: ${workspaceConfigProviderDefs.length}`);
+
+       let defsToUse: TokenData[] = [];
+       if (workspaceThemeConfigDefs.length > 0) {
+         defsToUse = workspaceThemeConfigDefs;
+         this.connection.console.log(`[Definition] Using ${defsToUse.length} ThemeConfig definitions from workspace (tokens.ts)`);
+       } else if (workspaceConfigProviderDefs.length > 0) {
+         defsToUse = workspaceConfigProviderDefs;
+         this.connection.console.log(`[Definition] Using ${defsToUse.length} ConfigProvider definitions from workspace`);
+       } else {
+         // Fall back to any workspace definitions
+         defsToUse = workspaceOnly;
+         this.connection.console.log(`[Definition] Using ${defsToUse.length} other workspace definitions`);
+       }
+
+      // Sort to prefer same file and line
+      const sortedDefs = defsToUse.sort((a, b) => {
+        const aScore = (a.uri === textDocument.uri ? 1 : 0) + (a.position.line === position.line ? 1 : 0);
+        const bScore = (b.uri === textDocument.uri ? 1 : 0) + (b.position.line === position.line ? 1 : 0);
+        return bScore - aScore;
+      });
+
+             // Return locations with proper URI conversion
+       return sortedDefs.map(def => {
+         // Convert file path to proper URI format
+         let uri = def.uri;
+         if (!uri.startsWith('file://') && !uri.startsWith('http://') && !uri.startsWith('https://')) {
+           // Convert relative or absolute path to file:// URI
+           const path = require('path');
+           const absolutePath = path.isAbsolute(def.uri) ? def.uri : path.resolve(this.rootPath, def.uri);
+           
+           // Properly format the URI for Windows
+           let normalizedPath = absolutePath.replace(/\\/g, '/');
+           // Remove any double slashes except for the drive letter
+           normalizedPath = normalizedPath.replace(/([^:])\/+/g, '$1/');
+           // Ensure proper file:// format
+           uri = `file:///${normalizedPath}`;
+         }
+         
+         this.connection.console.log(`[Definition] Converting URI: ${def.uri} -> ${uri}`);
+         
+         return {
+           uri,
+           range: {
+             start: def.position,
+             end: {
+               line: def.position.line,
+               character: def.position.character + searchTerm.length,
+             },
+           },
+         };
+       });
+    }
 
   private async onInlayHints(_params: InlayHintParams): Promise<InlayHint[]> {
     // TODO: Could add inlay hints showing token values inline
