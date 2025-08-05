@@ -318,11 +318,9 @@ export class AntdLs {
   private getSourceIcon(source: TokenData['source']): string {
     const icons = {
       'configProvider': '⚙️',
-      'useToken': '🪝',
-      'getToken': '🔍',
+      'ts': '📘',
       'themeConfig': '🎨',
       'json': '📄',
-      'css': '🎭'
     };
     return icons[source] || '📋';
   }
@@ -330,11 +328,9 @@ export class AntdLs {
   private getSourceLabel(source: TokenData['source']): string {
     const labels = {
       'configProvider': 'ConfigProvider',
-      'useToken': 'useToken() Hook',
-      'getToken': 'getToken() Hook',
+      'ts' : 'TypeScript File',
       'themeConfig': 'ThemeConfig',
       'json': 'JSON Config',
-      'css': 'CSS/LESS/SCSS'
     };
     return labels[source] || source;
   }

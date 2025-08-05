@@ -18,51 +18,50 @@ export function getAllTokenURIs(tokenIndex: TokenIndex): string[] {
 }
 
 export function getWordAtPosition(doc: TextDocument, position: Position): string {
-  const line = doc.getText({
-    start: { line: position.line, character: 0 },
-    end: { line: position.line + 1, character: 0 }
-  });
+  const text = doc.getText();
+  const offset = doc.offsetAt(position);
 
-  // Match camelCase, kebab-case, or dot.notation
-  const regex = /[\w-]+/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(line))) {
-    const start = match.index;
-    const end = start + match[0].length;
-    if (position.character >= start && position.character <= end) {
-      return match[0];
-    }
+  // Expand left until you hit a non-identifier character
+  let start = offset;
+  while (start > 0 && /[A-Za-z0-9_$]/.test(text[start - 1])) {
+    start--;
   }
 
-  return '';
+  // Expand right in the same way
+  let end = offset;
+  while (end < text.length && /[A-Za-z0-9_$]/.test(text[end])) {
+    end++;
+  }
+
+  return text.slice(start, end);
 }
 
 /**
- * Get the token property being accessed at a specific position
- * For example, if hovering over "colorPrimary" in "token.colorPrimary", returns "colorPrimary"
+ * If you’re hovering on “token.foo” or “theme.token.foo”, return “foo”
  */
-export function getTokenPropertyAtPosition(doc: TextDocument, position: Position): string | null {
-  const line = doc.getText({
+export function getTokenPropertyAtPosition(
+  doc: TextDocument,
+  position: Position
+): string | null {
+  const lineText = doc.getText({
     start: { line: position.line, character: 0 },
-    end: { line: position.line + 1, character: 0 }
+    end:   { line: position.line + 1, character: 0 },
   });
 
-  // Look for patterns like token.propertyName, theme.token.propertyName, etc.
-  const tokenAccessRegex = /(\w+\.)*token\.(\w+)/g;
-  let match: RegExpExecArray | null;
-  
-  while ((match = tokenAccessRegex.exec(line))) {
-    const fullMatch = match[0];
-    const tokenProperty = match[2]; // The property after 'token.'
-    const start = match.index;
-    const _end = start + fullMatch.length;
-    
-    // Check if cursor is within the token property part
-    const tokenPropertyStart = start + fullMatch.lastIndexOf(tokenProperty);
-    const tokenPropertyEnd = tokenPropertyStart + tokenProperty.length;
-    
-    if (position.character >= tokenPropertyStart && position.character <= tokenPropertyEnd) {
-      return tokenProperty;
+  // Look for token-access anywhere on this line
+  // Captures foo in either token.foo or theme.token.foo
+  const re = /\b(?:\w+\.)*token\.(\w+)\b/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(lineText))) {
+    const prop = m[1];
+    const propStart = m.index + m[0].lastIndexOf(prop);
+    const propEnd   = propStart + prop.length;
+
+    if (
+      position.character >= propStart &&
+      position.character <= propEnd
+    ) {
+      return prop;
     }
   }
 
@@ -149,6 +148,14 @@ export function resolveFullTokenValueAtPosition(
             findTokenUsages(sourceFile, 'token', word, results);
           }
         }
+      }
+    }
+
+    // Handle imported token usage (e.g., colorPrimary from imported JSON)
+    if (ts.isIdentifier(node) && node.text === word) {
+      if (offset >= node.getStart() && offset <= node.getEnd()) {
+        // This could be an imported token, but we'll let the main hover logic handle it
+        // by checking the token index for imported definitions
       }
     }
 
@@ -255,7 +262,8 @@ export function findExactTokenDefinitionAtPosition(
   fileContent: string,
   position: Position,
   tokenName: string,
-  tokenDefs: TokenData[]
+  tokenDefs: TokenData[],
+  context?: string // <-- new optional parameter
 ): TokenData | undefined {
   const sourceFile = ts.createSourceFile('file.tsx', fileContent, ts.ScriptTarget.Latest, true);
 
@@ -270,6 +278,12 @@ export function findExactTokenDefinitionAtPosition(
   }
 
   findNodeAt(sourceFile);
+
+  // Prefer context match if provided
+  if (context) {
+    const contextDef = tokenDefs.find(d => d.context === context);
+    if (contextDef) return contextDef;
+  }
 
   if (!foundNode) return;
 

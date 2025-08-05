@@ -11,13 +11,13 @@ export type TokenData = {
   uri: string;
   value: string;
   position: Position;
-  source: 'configProvider' | 'useToken' | 'getToken' | 'themeConfig' | 'json' | 'css';
+  source: 'configProvider' | 'themeConfig' | 'json' | 'ts';
   context?: string; // Additional context like component name or variable name
 };
 
 export type TokenIndex = Map<TokenName, TokenData[]>; // Changed to array to handle multiple definitions
 
-const supportedExtensions = /\.(ts|tsx|js|jsx|json)$/;  // disgarded |css|less|scss
+const supportedExtensions = /\.(ts|tsx|js|jsx|json)$/; 
 const ignoredDirs = ["node_modules", "dist", "build", ".git", ".next", "out", "coverage", "public", "tmp", "temp", "logs", "cache", "css", "scss", "less", "styles", "assets", "static", "vendor", "bower_components"];
 
 // Common Ant Design token names for better matching
@@ -47,10 +47,7 @@ export async function scanAndIndexTokens(
       await extractFromTsxTs(filePath, content, tokenIndex);
     } else if (filePath.endsWith(".json")) {
       await extractFromJson(filePath, content, tokenIndex);
-    } 
-    //else if (/\.(css|less|scss)$/.test(filePath)) {
-    //   await extractFromCssLike(filePath, content, tokenIndex);
-    // }
+    }
   }));
 }
 
@@ -85,12 +82,6 @@ async function extractFromTsxTs(
   
   // Extract from ConfigProvider
   await extractFromConfigProvider(sourceFile, filePath, index);
-  
-  // Extract from useToken() and getToken() hooks
-  // await _extractFromTokenHooks(sourceFile, filePath, index); causes errors for now as its overriding values of tokens but not fixed as unused
-  
-  // Extract token property accesses
-  // await  _extractTokenPropertyAccess(sourceFile, filePath, index);
 
   // Use ts-morph for advanced extraction
   if (filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
@@ -125,7 +116,7 @@ async function extractWithTsMorph(
             line: posInfo.line - 1,
             character: posInfo.column - 1,
           },
-          source: "themeConfig",
+          source: "ts",
         });
       }
     } 
@@ -244,94 +235,6 @@ async function extractFromConfigProvider(
   visit(sourceFile);
 }
 
-async function _extractFromTokenHooks(
-  sourceFile: ts.SourceFile,
-  filePath: string,
-  index: TokenIndex
-) {
-  function visit(node: ts.Node) {
-    // Look for useToken() hook calls
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      (node.expression.text === 'useToken' || node.expression.text === 'getToken')
-    ) {
-      const pos = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-      
-      // Check if it's part of destructuring assignment
-      const parent = node.parent;
-      if (ts.isVariableDeclaration(parent) && parent.name) {
-        if (ts.isObjectBindingPattern(parent.name)) {
-          // const { token } = useToken()
-          for (const element of parent.name.elements) {
-            if (
-              ts.isBindingElement(element) &&
-              ts.isIdentifier(element.name) &&
-              element.name.text === 'token'
-            ) {
-              // Mark this as a token object source
-              addTokenToIndex(index, 'token', {
-                uri: filePath,
-                value: 'useToken().token',
-                position: pos,
-                source: node.expression.text === 'useToken' ? 'useToken' : 'getToken',
-                context: 'hook'
-              });
-            }
-          }
-        } else if (ts.isIdentifier(parent.name)) {
-          // const tokenObj = useToken()
-          addTokenToIndex(index, parent.name.text, {
-            uri: filePath,
-            value: `${node.expression.text}()`,
-            position: pos,
-            source: node.expression.text === 'useToken' ? 'useToken' : 'getToken',
-            context: 'hook'
-          });
-        }
-      }
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-}
-
-async function _extractTokenPropertyAccess(
-  sourceFile: ts.SourceFile,
-  filePath: string,
-  index: TokenIndex
-) {
-  function visit(node: ts.Node) {
-    // Look for token.propertyName or tokenObj.token.propertyName
-    if (ts.isPropertyAccessExpression(node)) {
-      const chain = getPropertyAccessChain(node);
-      
-      // Check if this looks like token access
-      if (isTokenAccess(chain)) {
-        const tokenName = chain[chain.length - 1];
-        const pos = sourceFile.getLineAndCharacterOfPosition(node.name.getStart());
-        
-        // Only add if it's a known Ant Design token or follows token pattern
-        if (commonAntdTokens.has(tokenName) || isLikelyTokenName(tokenName)) {
-          addTokenToIndex(index, tokenName, {
-            uri: filePath,
-            value: chain.join('.'),
-            position: pos,
-            source: 'useToken',
-            context: 'property-access'
-          });
-        }
-      }
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-}
-
 function extractTokensFromThemeObject(
   node: ts.Expression,
   sourceFile: ts.SourceFile,
@@ -368,31 +271,6 @@ function extractTokensFromThemeObject(
       }
     }
   }
-}
-
-function getPropertyAccessChain(node: ts.PropertyAccessExpression): string[] {
-  const chain: string[] = [];
-  let current: ts.Expression = node;
-
-  while (ts.isPropertyAccessExpression(current)) {
-    chain.unshift(current.name.text);
-    current = current.expression;
-  }
-
-  if (ts.isIdentifier(current)) {
-    chain.unshift(current.text);
-  }
-
-  return chain;
-}
-
-function isTokenAccess(chain: string[]): boolean {
-  if (chain.length < 2) return false;
-  
-  // Patterns like: token.colorPrimary, tokenObj.token.colorPrimary, theme.token.colorPrimary
-  return chain.includes('token') || 
-         chain[0] === 'token' || 
-         (chain.length >= 2 && chain[chain.length - 2] === 'token');
 }
 
 function isLikelyTokenName(name: string): boolean {
@@ -458,27 +336,5 @@ async function extractFromJson(
     collectTokens(data);
   } catch (err) {
     console.warn(`Failed to parse JSON5 in ${filePath}:`, err);
-  }
-}
-
-
-async function _extractFromCssLike( //function not used for now
-  filePath: string,
-  content: string,
-  index: TokenIndex
-) {
-  const lines = content.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const matches = Array.from(lines[i].matchAll(/@([\w-]+)/g));
-    for (const match of matches) {
-      const token = match[1];
-      const pos = match.index ?? 0;
-      addTokenToIndex(index, token, {
-        uri: filePath,
-        value: token,
-        position: { line: i, character: pos },
-        source: 'css'
-      });
-    }
   }
 }
