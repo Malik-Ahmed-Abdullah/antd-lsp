@@ -9,7 +9,7 @@ export type TokenName = string;
 
 export type TokenData = {
   uri: string;
-  value: string;
+  value: string | {value: string};
   position: Position;
   source: 'configProvider' | 'themeConfig' | 'json' | 'ts';
   context?: string; // Additional context like component name or variable name

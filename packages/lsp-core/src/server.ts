@@ -171,8 +171,25 @@ export class AntdLs {
     const icon = this.getSourceIcon(primary.tokenData.source);
     const label = this.getSourceLabel(primary.tokenData.source);
 
+    let resolvedValue: string | undefined;
+
+    if (typeof primary.tokenData.value === 'string') {
+      const referenced = this.tokenIndex.get(primary.tokenData.value);
+      if (referenced?.length) {
+        // Pick the highest confidence match (prefer json or ts)
+        const ref = referenced.find(d => d.source === 'json' || d.source === 'ts') || referenced[0];
+        resolvedValue = typeof ref.value === 'string' ? ref.value : undefined;
+      } else {
+        resolvedValue = primary.tokenData.value;
+      }
+    } else if (typeof primary.tokenData.value === 'object' && primary.tokenData.value?.value) {
+      resolvedValue = primary.tokenData.value.value;
+    } else {
+      resolvedValue = String(primary.tokenData.value);
+    }
+
     let md = `**Ant Design Token**: \`${word}\`\n\n` +
-             `${icon} **${label}**: \`${primary.tokenData.value}\`\n\n`;
+             `${icon} **${label}**: \`${resolvedValue}\`\n\n`;
 
     const usage = this.getTokenUsageInfo(word);
     if (usage) md += `${usage}\n\n`;
