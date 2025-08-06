@@ -1,457 +1,307 @@
 import {
-  type Connection,
+  Connection,
   createConnection,
-  type DidChangeWatchedFilesParams,
-  type Disposable,
-  type FileOperationOptions,
-  type Hover,
-  type HoverParams,
-  type InitializeParams,
-  type InitializeResult,
-  type InlayHint,
-  type InlayHintParams,
+  DidChangeWatchedFilesParams,
+  Disposable,
+  FileOperationOptions,
+  Hover,
+  HoverParams,
+  InitializeParams,
+  InitializeResult,
+  InlayHint,
+  InlayHintParams,
   ProposedFeatures,
   TextDocumentSyncKind,
   TextDocuments,
-} from "vscode-languageserver/node"
-import { TextDocument } from "vscode-languageserver-textdocument"
-import { getWordAtPosition, resolveFullTokenValueAtPosition, getTokenPropertyAtPosition , findExactTokenDefinitionAtPosition , resolveLocalTokenAtPosition} from "./util"
-import { TokenIndex, TokenData } from "./scanner"
-import { Position, Location } from "vscode-languageserver-types"
-import { scanAndIndexTokens } from './scanner'
-import { fileURLToPath } from 'url'; 
-import { createRenameHandler } from './rename'; 
+} from "vscode-languageserver/node";
+import { TextDocument } from "vscode-languageserver-textdocument";
+import {
+  getWordAtPosition,
+  resolveFullTokenValueAtPosition,
+  getTokenPropertyAtPosition,
+  resolveLocalTokenAtPosition,
+  ContextualTokenMatch,
+  resolveTokenInContext,
+} from "./util";
+import { TokenIndex, TokenData } from "./scanner";
+import { Position, Location } from "vscode-languageserver-types";
+import { scanAndIndexTokens } from "./scanner";
+import { fileURLToPath } from "url";
+import { createRenameHandler } from "./rename";
 
 export class AntdLs {
-  private readonly disposables: Array<Disposable> = [];
+  private disposables: Disposable[] = [];
   private tokenIndex: TokenIndex = new Map();
-  private rootPath: string = '';
-  private isInitialized: boolean = false;
+  private rootPath = "";
+  private isInitialized = false;
 
   constructor(
-    private readonly connection: Connection,
-    private readonly docs: TextDocuments<TextDocument>,
-  ) {
-    console.debug("AntdLs instance created.")
-  }
+    private connection: Connection,
+    private docs: TextDocuments<TextDocument>
+  ) {}
 
   static create(): AntdLs {
-    const connection = createConnection(ProposedFeatures.all)
-    const docs = new TextDocuments(TextDocument)
-
-    return new AntdLs(connection, docs)
+    const connection = createConnection(ProposedFeatures.all);
+    const docs = new TextDocuments(TextDocument);
+    return new AntdLs(connection, docs);
   }
 
-  async start(): Promise<void> {
-    this.connection.onInitialize(this.onInitialize.bind(this))
-    this.connection.onInitialized(this.onInitialized.bind(this)) // Add this handler
-    this.connection.onHover(this.onHover.bind(this))
+  public async start(): Promise<void> {
+    this.connection.onInitialize(this.onInitialize.bind(this));
+    this.connection.onInitialized(this.onInitialized.bind(this));
+    this.connection.onHover(this.onHover.bind(this));
     this.connection.onDefinition(this.onDefinition.bind(this));
-    this.connection.languages.inlayHint.on(this.onInlayHints.bind(this))
+    this.connection.languages.inlayHint.on(this.onInlayHints.bind(this));
 
     const renameHandler = createRenameHandler(this.docs, this.tokenIndex, this.connection);
     this.connection.onPrepareRename(renameHandler.prepareRename);
     this.connection.onRenameRequest(renameHandler.rename);
-    
-    this.connection.onDidChangeWatchedFiles(this.handleFileChange.bind(this))
 
-    // Also trigger indexing when documents are opened
-    this.docs.onDidOpen(this.onDocumentOpen.bind(this))
+    this.connection.onDidChangeWatchedFiles(this.handleFileChange.bind(this));
+    this.docs.onDidOpen(this.onDocumentOpen.bind(this));
 
-    this.connection.onShutdown(async () => {
-      console.debug("Antd Language Server shutting down...")
-    })
-
-    this.docs.listen(this.connection)
-    this.connection.listen()
+    this.docs.listen(this.connection);
+    this.connection.listen();
   }
 
   private async onInitialize(params: InitializeParams): Promise<InitializeResult> {
-    console.debug("Antd Language Server initializing...")
-    
-    // Store the root path but don't scan yet
     this.rootPath = params.rootUri ? fileURLToPath(params.rootUri) : "";
-    
-    const capabilities = params.capabilities;
-    const supportsWatchFileChanges =
-      capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration;
-
-    const fileWatchGlob = "**/*.{ts,tsx,js,jsx,json}";
-    let fileOperations: FileOperationOptions = {};
-    if (supportsWatchFileChanges) {
-      fileOperations = {
-        didCreate: { filters: [{ pattern: { glob: fileWatchGlob } }] },
-        didDelete: { filters: [{ pattern: { glob: fileWatchGlob } }] },
-      };
-    }
+    const supportsWatch = params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration;
+    const fileGlob = "**/*.{ts,tsx,js,jsx,json}";
+    const fileOps: FileOperationOptions = supportsWatch
+      ? {
+          didCreate: { filters: [{ pattern: { glob: fileGlob } }] },
+          didDelete: { filters: [{ pattern: { glob: fileGlob } }] },
+        }
+      : {};
 
     return {
       capabilities: {
         hoverProvider: true,
-        inlayHintProvider: false,
         definitionProvider: true,
-        renameProvider: {
-          prepareProvider: true, // Enable prepare rename
-        },
+        renameProvider: { prepareProvider: true },
         textDocumentSync: TextDocumentSyncKind.Incremental,
-        workspace: { fileOperations },
+        workspace: { fileOperations: fileOps },
       },
-      serverInfo: {
-        name: "Antd Language Server",
-        version: "0.0.1",
-      },
+      serverInfo: { name: "Antd Language Server", version: "0.0.1" },
     };
   }
 
-  // New method: called after initialization is complete
   private async onInitialized(): Promise<void> {
-    console.debug("Antd Language Server initialized, starting token indexing...")
-    
     if (this.rootPath) {
-      try {
-        await this.performTokenIndexing();
-        this.isInitialized = true;
-        this.connection.console.log(`Initial token indexing completed. Found ${this.tokenIndex.size} unique tokens.`);
-      } catch (error) {
-        this.connection.console.error(`Failed to perform initial token indexing: ${error}`);
-      }
+      await this.performTokenIndexing();
+      this.isInitialized = true;
     }
   }
 
-  // New method: called when a document is opened
   private async onDocumentOpen(): Promise<void> {
-    // If we haven't indexed yet (fallback), do it now
     if (!this.isInitialized && this.rootPath) {
-      console.debug("Document opened, triggering token indexing as fallback...")
-      try {
-        await this.performTokenIndexing();
-        this.isInitialized = true;
-        this.connection.console.log(`Token indexing completed on document open. Found ${this.tokenIndex.size} unique tokens.`);
-      } catch (error) {
-        this.connection.console.error(`Failed to perform token indexing on document open: ${error}`);
-      }
+      await this.performTokenIndexing();
+      this.isInitialized = true;
     }
   }
 
   private async performTokenIndexing(): Promise<void> {
-    if (!this.rootPath) {
-      console.warn("No root path available for token indexing");
-      return;
-    }
-
-    console.debug(`Starting token indexing for path: ${this.rootPath}`);
-    
-    try {
-      await scanAndIndexTokens(this.rootPath, this.tokenIndex);
-      console.debug(`Token indexing completed. Index size: ${this.tokenIndex.size}`);
-      
-      // Log some debug info about what was found
-      if (this.tokenIndex.size > 0) {
-        const sampleTokens = Array.from(this.tokenIndex.keys()).slice(0, 10);
-        this.connection.console.log(`Sample tokens found: ${sampleTokens.join(', ')}`);
-        
-        // Log distribution by source type
-        const sourceDistribution: Record<string, number> = {};
-        for (const tokenDefs of Array.from(this.tokenIndex.values())) {
-          for (const def of tokenDefs) {
-            sourceDistribution[def.source] = (sourceDistribution[def.source] || 0) + 1;
-          }
-        }
-        this.connection.console.log(`Token sources: ${JSON.stringify(sourceDistribution)}`);
-      } else {
-        this.connection.console.log("No tokens found during indexing");
-      }
-    } catch (error) {
-      this.connection.console.error(`Token indexing failed: ${error}`);
-      throw error;
-    }
+    if (!this.rootPath) return;
+    await scanAndIndexTokens(this.rootPath, this.tokenIndex);
   }
 
-  private async handleFileChange(_params: DidChangeWatchedFilesParams): Promise<void> {
-    if (!this.isInitialized) {
-      console.debug("File change detected but not initialized yet, skipping re-index");
-      return;
-    }
-
-    // Re-scan the entire project when files change
-    if (this.rootPath) {
-      try {
-        await this.performTokenIndexing();
-        this.connection.console.log(`Re-indexed tokens after file changes. Found ${this.tokenIndex.size} unique tokens.`);
-      } catch (error) {
-        this.connection.console.error(`Failed to re-index tokens: ${error}`);
-      }
+  private async handleFileChange(_: DidChangeWatchedFilesParams): Promise<void> {
+    if (this.isInitialized && this.rootPath) {
+      await this.performTokenIndexing();
     }
   }
 
   private onHover({ textDocument, position }: HoverParams): Hover | undefined {
     const doc = this.docs.get(textDocument.uri);
-    if (!doc) return;
+    if (!doc || !this.isInitialized) return;
 
-    // Ensure we're initialized before processing hover
-    if (!this.isInitialized) {
-      this.connection.console.log("Hover request received but server not fully initialized yet");
-      // Trigger indexing as emergency fallback
-      if (this.rootPath) {
-        this.performTokenIndexing().then(() => {
-          this.isInitialized = true;
-        }).catch(error => {
-          this.connection.console.error(`Emergency token indexing failed: ${error}`);
-        });
-      }
-      return undefined;
+    let word = getWordAtPosition(doc, position);
+    const content = doc.getText();
+
+    // local resolution
+    const local = resolveLocalTokenAtPosition(textDocument.uri, content, position, word);
+    if (local) {
+      return { contents: { kind: 'markdown', value: `**Local**: \`${local}\`` } };
     }
 
-    const word = getWordAtPosition(doc, position);
-    const fileContent = doc.getText();
-
-    this.connection.console.log(`[Hover] Word: ${word} at ${position.line}:${position.character}, Index size: ${this.tokenIndex.size}`);
-
-    //resolve local variable values first
-    const localValue = resolveLocalTokenAtPosition(
-      textDocument.uri,
-      fileContent,
-      position,
-      word
-    );
-
-    if (localValue !== undefined) {
-      this.connection.console.log(`[Hover] '${word}' resolved from local variable`);
-      return {
-        contents: {
-          kind: 'markdown',
-          value: `**Ant Design Token (local)**: \`${word}\`\n\n💡 \`${localValue}\` *(from local declaration)*`
-        }
-      };
-    }
-    // First, try to resolve local token values like theme.token.colorPrimary
-    const resolvedValues = resolveFullTokenValueAtPosition(
-      word,
-      fileContent,
-      position
-    );
-
-    if (resolvedValues && resolvedValues.length > 0) {
-      this.connection.console.log(`[Hover] Resolved local values: ${JSON.stringify(resolvedValues)}`);
-      return this.createHoverFromResolvedValues(word, resolvedValues);
+    // full resolution
+    const full = resolveFullTokenValueAtPosition(word, content, position);
+    if (full?.length) {
+      return this.createHoverFromResolvedValues(word, full);
     }
 
-    // Check if we're hovering over a token property access
-    const tokenProperty = getTokenPropertyAtPosition(doc, position);
-    if (tokenProperty) {
-      this.connection.console.log(`[Hover] Token property: ${tokenProperty}`);
-      const tokenDefs = this.tokenIndex.get(tokenProperty);
-      if (tokenDefs && tokenDefs.length > 0) {
-          const exactMatch = findExactTokenDefinitionAtPosition(fileContent, position, word, tokenDefs);
-          if (exactMatch) {
-            return this.createHoverFromTokenDefs(word, [exactMatch], textDocument.uri, position);
-          }
-      }
-    }
+    // property access
+    const prop = getTokenPropertyAtPosition(doc, position);
+    if (prop && prop !== word) word = prop;
 
-    // Check the token index for the word
-    const tokenDefs = this.tokenIndex.get(word);
-    this.connection.console.log(`[Hover] Token Index Definitions for '${word}': ${tokenDefs ? tokenDefs.length : 0} found`);
+    const defs = this.tokenIndex.get(word) || [];
+    if (!defs.length) return;
 
-    if (tokenDefs && tokenDefs.length > 0) {
-      const exactMatch = findExactTokenDefinitionAtPosition(fileContent, position, word, tokenDefs);
-      if (exactMatch) {
-        return this.createHoverFromTokenDefs(word, [exactMatch], textDocument.uri, position);
-      }
-    }
+    const matches = this.prioritizeTokenMatches(defs, doc, position, word, content);
+    if (!matches.length) return;
 
-
-    return undefined;
+    return this.createPrioritizedHover(word, matches, textDocument.uri, position);
   }
 
-  private createHoverFromResolvedValues(word: string, values: string[]): Hover {
-    const valueList = values.map(v => `\`${v}\``).join(', ');
+  private prioritizeTokenMatches(
+    tokenDefs: TokenData[],
+    doc: TextDocument,
+    pos: Position,
+    name: string,
+    content: string
+  ): ContextualTokenMatch[] {
+    const ctx = resolveTokenInContext(doc, pos, name, this.tokenIndex, content);
+    const theme = ctx.filter(m => m.tokenData.source === 'themeConfig');
+    if (theme.length) {
+      const boosted = theme.map(m => ({ ...m, confidence: Math.min(m.confidence + 20, 100) }));
+      return [...boosted, ...ctx.filter(m => m.tokenData.source !== 'themeConfig')]
+        .sort((a, b) => b.confidence - a.confidence);
+    }
+    return ctx.sort((a, b) => b.confidence - a.confidence);
+  }
+
+  private createPrioritizedHover(
+    word: string,
+    matches: ContextualTokenMatch[],
+    _uri: string,
+    _pos: Position
+  ): Hover {
+    const primary = matches.find(m => m.tokenData.source === 'themeConfig') || matches[0];
+    const icon = this.getSourceIcon(primary.tokenData.source);
+    const label = this.getSourceLabel(primary.tokenData.source);
+
+    let md = `**Ant Design Token**: \`${word}\`\n\n` +
+             `${icon} **${label}**: \`${primary.tokenData.value}\`\n\n`;
+
+    const usage = this.getTokenUsageInfo(word);
+    if (usage) md += `${usage}\n\n`;
+
+    const otherCount = matches.length - 1;
+    if (otherCount > 0) md += `**Other definitions available (${otherCount})**`;
+
+    return { contents: { kind: 'markdown', value: md.trim() } };
+  }
+
+  private createHoverFromResolvedValues(word: string, vals: string[]): Hover {
     return {
       contents: {
-        kind: "markdown",
-        value: `**Ant Design Token**: \`${word}\`\n\n📄 **Local Values**: ${valueList}\n\n*Resolved from local variable assignments*`,
+        kind: 'markdown',
+        value: `**Ant Design Token**: \`${word}\`\n\n` +
+               `Resolved values: ${vals.map(v => `\`${v}\``).join(', ')}`,
       },
     };
   }
 
-  private createHoverFromTokenDefs(word: string, tokenDefs: TokenData[], currentUri?: string, position?: Position): Hover {
-  let content = `**Ant Design Token**: \`${word}\`\n\n`;
-
-  // Prefer tokens from same file
-  const sortedDefs = [...tokenDefs].sort((a, b) => {
-    const aScore = (a.uri === currentUri ? 1 : 0) + (a.position.line === position?.line ? 1 : 0);
-    const bScore = (b.uri === currentUri ? 1 : 0) + (b.position.line === position?.line ? 1 : 0);
-    return bScore - aScore;
-  });
-
-  // Group by source
-  const bySource = sortedDefs.reduce((acc, def) => {
-    if (!acc[def.source]) acc[def.source] = [];
-    acc[def.source].push(def);
-    return acc;
-  }, {} as Record<string, TokenData[]>);
-
-  for (const [source, defs] of Object.entries(bySource)) {
-    const icon = this.getSourceIcon(source as TokenData['source']);
-    content += `${icon} **${this.getSourceLabel(source as TokenData['source'])}**:\n`;
-
-    for (const def of defs) {
-      const fileName = def.uri.split('/').pop() || def.uri;
-      content += `  - \`${def.value}\` *(${fileName}${def.context ? `, ${def.context}` : ''})*\n`;
-    }
-    content += '\n';
+  private getSourceIcon(src: TokenData['source']): string {
+    return {
+      configProvider: '⚙️',
+      ts: '📘',
+      themeConfig: '🎨',
+      json: '📄',
+    }[src] || '📋';
   }
 
-  if (this.isCommonAntdToken(word)) {
-    content += this.getTokenUsageInfo(word);
-  }
-
-  return {
-    contents: {
-      kind: "markdown",
-      value: content.trim(),
-    },
-  };
-}
-
-
-  private getSourceIcon(source: TokenData['source']): string {
-    const icons = {
-      'configProvider': '⚙️',
-      'ts': '📘',
-      'themeConfig': '🎨',
-      'json': '📄',
-    };
-    return icons[source] || '📋';
-  }
-
-  private getSourceLabel(source: TokenData['source']): string {
-    const labels = {
-      'configProvider': 'ConfigProvider',
-      'ts' : 'TypeScript File',
-      'themeConfig': 'ThemeConfig',
-      'json': 'JSON Config',
-    };
-    return labels[source] || source;
-  }
-
-  private isCommonAntdToken(word: string): boolean {
-    const commonTokens = [
-      'colorPrimary', 'colorSuccess', 'colorWarning', 'colorError', 'colorInfo',
-      'colorTextBase', 'colorBgBase', 'colorText', 'colorTextSecondary',
-      'borderRadius', 'borderRadiusLG', 'borderRadiusSM', 'borderRadiusXS',
-      'fontSize', 'fontSizeLG', 'fontSizeSM', 'fontSizeXL'
-    ];
-    return commonTokens.includes(word);
+  private getSourceLabel(src: TokenData['source']): string {
+    return {
+      configProvider: 'ConfigProvider',
+      ts: 'TypeScript',
+      themeConfig: 'ThemeConfig',
+      json: 'JSON',
+    }[src] || src;
   }
 
   private getTokenUsageInfo(word: string): string {
-    const tokenInfo: Record<string, string> = {
-      'colorPrimary': 'Primary brand color used for main actions and highlights',
-      'colorSuccess': 'Success state color for positive feedback',
-      'colorWarning': 'Warning state color for caution states',
-      'colorError': 'Error state color for negative feedback',
-      'colorInfo': 'Info state color for informational content',
-      'borderRadius': 'Base border radius for rounded corners',
-      'borderRadiusLG': 'Large border radius for prominent elements',
-      'borderRadiusSM': 'Small border radius for subtle rounding',
-      'fontSize': 'Base font size for body text',
-      'fontSizeLG': 'Large font size for headings',
-      'fontSizeSM': 'Small font size for secondary text'
+    const info: Record<string, string> = {
+      // Colors
+      colorPrimary: 'Primary brand color used for main actions and highlights',
+      colorSuccess: 'Color used to indicate success or positive actions',
+      colorWarning: 'Color used for warnings and cautionary visuals',
+      colorError: 'Color used to indicate errors or critical issues',
+      colorInfo: 'Color used to present informative content',
+      colorTextBase: 'Base color for normal body text',
+      colorTextSecondary: 'Used for secondary or less important text',
+      colorTextDisabled: 'Color for disabled text, often lighter or grayed out',
+      colorBgBase: 'Base background color for surfaces like cards and modals',
+      colorBorder: 'Default border color for input boxes, cards, etc.',
+      colorFillSecondary: 'Used for secondary fills, e.g., hover states',
+
+      // Font
+      fontSize: 'Base font size used throughout the UI',
+      fontSizeSM: 'Small font size for minor UI elements like captions',
+      fontSizeLG: 'Larger font size for headings or key highlights',
+      fontFamily: 'Font family used throughout the application',
+      lineHeight: 'Default line height for readable text spacing',
+
+      // Spacing
+      marginXXS: 'Extra extra small margin spacing',
+      marginXS: 'Extra small margin spacing',
+      marginSM: 'Small margin spacing',
+      marginMD: 'Medium margin spacing',
+      marginLG: 'Large margin spacing',
+      marginXL: 'Extra large margin spacing',
+      paddingXXS: 'Extra extra small padding spacing',
+      paddingXS: 'Extra small padding spacing',
+      paddingSM: 'Small padding spacing',
+      paddingMD: 'Medium padding spacing',
+      paddingLG: 'Large padding spacing',
+      paddingXL: 'Extra large padding spacing',
+
+      // Border radius
+      borderRadius: 'Default border radius for components like buttons and cards',
+      borderRadiusSM: 'Small border radius, used for compact components',
+      borderRadiusLG: 'Large border radius, often for bigger cards or modals',
+
+      // Shadows
+      boxShadow: 'Default box shadow used for popups and elevated elements',
+      boxShadowSecondary: 'Secondary shadow, often for subtle depth',
+
+      // Z-index
+      zIndexPopup: 'Z-index for popup components like modals or tooltips',
+
+      // Heights and Sizes
+      controlHeight: 'Default height of form controls like input and select',
+      controlHeightSM: 'Small size variant for compact UI',
+      controlHeightLG: 'Large size variant for more prominent UI',
+      controlPaddingHorizontal: 'Horizontal padding inside inputs, buttons, etc.',
+
+      // Others
+      motionDurationSlow: 'Used for slower animations and transitions',
+      motionDurationFast: 'Used for quick transitions like button presses',
+      opacityLoading: 'Default opacity for loading overlays and spinners',
     };
 
-    const info = tokenInfo[word];
-    if (info) {
-      return `\n💡 **Usage**: ${info}`;
-    }
-    return '';
+    return info[word] ? `💡 Usage: ${info[word]}` : '';
   }
 
-  private onDefinition({
-    textDocument,
-    position,
-    }: {
-      textDocument: { uri: string };
-      position: Position;
-    }): Location[] {
-      const doc = this.docs.get(textDocument.uri);
-      if (!doc || !this.isInitialized) return [];
 
-      // Try to get token name from property access first
-      let searchTerm = getTokenPropertyAtPosition(doc, position) || getWordAtPosition(doc, position);
-      if (!searchTerm) return [];
+  private onDefinition({ textDocument, position }: { textDocument: { uri: string }; position: Position }): Location[] {
+    if (!this.isInitialized) return [];
+    const doc = this.docs.get(textDocument.uri);
+    if (!doc) return [];
 
-      // Get all definitions for this token
-      const tokenDefs = this.tokenIndex.get(searchTerm);
-      if (!tokenDefs || tokenDefs.length === 0) return [];
+    const name = getTokenPropertyAtPosition(doc, position) || getWordAtPosition(doc, position);
+    if (!name) return [];
 
-      // Debug logging to understand what we're finding
-      this.connection.console.log(`[Definition] Found ${tokenDefs.length} definitions for '${searchTerm}'`);
-      tokenDefs.forEach((def, i) => {
-        this.connection.console.log(`[Definition] ${i + 1}. Source: ${def.source}, URI: ${def.uri}, Value: ${def.value}`);
-      });
+    const defs = this.tokenIndex.get(name) || [];
+    const workspace = defs.filter(d => !d.uri.includes('node_modules'));
+    const themeDefs = workspace.filter(d => d.source === 'themeConfig');
+    const configDefs = workspace.filter(d => d.source === 'configProvider');
+    const chosen = themeDefs.length ? themeDefs : configDefs.length ? configDefs : workspace;
 
-             // Filter out node_modules completely and prioritize workspace themeConfig (your tokens.ts file)
-       const workspaceOnly = tokenDefs.filter(def => !def.uri.includes("node_modules"));
-       const workspaceThemeConfigDefs = workspaceOnly.filter(def => def.source === "themeConfig");
-       const workspaceConfigProviderDefs = workspaceOnly.filter(def => def.source === "configProvider");
+    return chosen.sort((_a, _b) => 0) // could sort
+      .map(def => ({ uri: this.toFileUri(def.uri), range: { start: def.position, end: { line: def.position.line, character: def.position.character + name.length } } }));
+  }
 
-       this.connection.console.log(`[Definition] Workspace-only: ${workspaceOnly.length}, ThemeConfig: ${workspaceThemeConfigDefs.length}, ConfigProvider: ${workspaceConfigProviderDefs.length}`);
-
-       let defsToUse: TokenData[] = [];
-       if (workspaceThemeConfigDefs.length > 0) {
-         defsToUse = workspaceThemeConfigDefs;
-         this.connection.console.log(`[Definition] Using ${defsToUse.length} ThemeConfig definitions from workspace (tokens.ts)`);
-       } else if (workspaceConfigProviderDefs.length > 0) {
-         defsToUse = workspaceConfigProviderDefs;
-         this.connection.console.log(`[Definition] Using ${defsToUse.length} ConfigProvider definitions from workspace`);
-       } else {
-         // Fall back to any workspace definitions
-         defsToUse = workspaceOnly;
-         this.connection.console.log(`[Definition] Using ${defsToUse.length} other workspace definitions`);
-       }
-
-      // Sort to prefer same file and line
-      const sortedDefs = defsToUse.sort((a, b) => {
-        const aScore = (a.uri === textDocument.uri ? 1 : 0) + (a.position.line === position.line ? 1 : 0);
-        const bScore = (b.uri === textDocument.uri ? 1 : 0) + (b.position.line === position.line ? 1 : 0);
-        return bScore - aScore;
-      });
-
-             // Return locations with proper URI conversion
-       return sortedDefs.map(def => {
-         // Convert file path to proper URI format
-         let uri = def.uri;
-         if (!uri.startsWith('file://') && !uri.startsWith('http://') && !uri.startsWith('https://')) {
-           // Convert relative or absolute path to file:// URI
-           const path = require('path');
-           const absolutePath = path.isAbsolute(def.uri) ? def.uri : path.resolve(this.rootPath, def.uri);
-           
-           // Properly format the URI for Windows
-           let normalizedPath = absolutePath.replace(/\\/g, '/');
-           // Remove any double slashes except for the drive letter
-           normalizedPath = normalizedPath.replace(/([^:])\/+/g, '$1/');
-           // Ensure proper file:// format
-           uri = `file:///${normalizedPath}`;
-         }
-         
-         this.connection.console.log(`[Definition] Converting URI: ${def.uri} -> ${uri}`);
-         
-         return {
-           uri,
-           range: {
-             start: def.position,
-             end: {
-               line: def.position.line,
-               character: def.position.character + searchTerm.length,
-             },
-           },
-         };
-       });
+  private toFileUri(pathStr: string): string {
+    let uri = pathStr;
+    if (!uri.startsWith('file://')) {
+      uri = `file:///${pathStr.replace(/\\/g, '/')}`;
     }
+    return uri;
+  }
 
-  private async onInlayHints(_params: InlayHintParams): Promise<InlayHint[]> {
-    // TODO: Could add inlay hints showing token values inline
-    return []
+  private async onInlayHints(_: InlayHintParams): Promise<InlayHint[]> {
+    return [];
   }
 }

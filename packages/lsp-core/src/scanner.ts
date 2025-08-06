@@ -275,18 +275,15 @@ function extractTokensFromThemeObject(
 
 function isLikelyTokenName(name: string): boolean {
   const prefixes = ['color', 'font', 'line', 'border', 'spacing', 'control', 'motion', 'size'];
-  //const suffixes = ['Radius', 'Height', 'Duration', 'Width', 'Size'];
   const states = ['primary', 'secondary', 'success', 'warning', 'error', 'info'];
 
-  const prefixMatch = prefixes.find(prefix =>
-    name.startsWith(prefix) && name.length > prefix.length && /[A-Za-z]/.test(name[prefix.length])
-  );
-
-  //const suffixMatch = suffixes.some(suffix => name.endsWith(suffix));
+  const prefixMatch = prefixes.some(prefix => name.startsWith(prefix));
   const stateMatch = states.some(state => name.toLowerCase().includes(state));
+  const camelCasePattern = /^[a-z]+(?:[A-Z][a-z]*)+$/;
 
-  return Boolean(prefixMatch  || stateMatch); // ||suffixMatch
+  return (prefixMatch || stateMatch || camelCasePattern.test(name));
 }
+
 
 
 function extractValue(node: ts.Expression, sourceFile: ts.SourceFile): string {
